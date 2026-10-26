@@ -184,13 +184,27 @@ func _process(_delta: float) -> void:
     # the recognition row from showing through the same bottom context strip.
     if is_instance_valid(game):
         follow_traffic(game.get("truck_nodes"),game.get("moving_trucks"))
+        var frozen := bool(game.get("paused")) or bool(game.get("won")) or bool(game.get("failed"))
+        var show_areas := _configured and _campaign and not is_overview()
+        for viewport in [dock_viewport,yard_viewport]:
+            _set_render_updates(viewport,show_areas,frozen)
         var show_road := visible and not bool(game.get("test_mode"))
         for control in _road_frames: control.visible = show_road
-        road_viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS if show_road else SubViewport.UPDATE_DISABLED
+        _set_render_updates(road_viewport,show_road,frozen)
     if legend != null and is_instance_valid(game):
         var toast: Label = game.get("toast_label")
         var context: Label = game.get("status_label")
         legend.visible = (toast == null or not toast.visible) and (context == null or context.text.is_empty())
+
+func _set_render_updates(viewport: SubViewport, active: bool, frozen: bool) -> void:
+    if not active:
+        viewport.render_target_update_mode = SubViewport.UPDATE_DISABLED
+    elif not frozen:
+        viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+    elif viewport.render_target_update_mode == SubViewport.UPDATE_ALWAYS:
+        # Capture the final pose once, then let Godot retain that texture.
+        # Re-rendering three unchanged 3D views can starve menu input on Web.
+        viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
 
 func _refresh_visibility() -> void:
     var active := _configured and _campaign and not is_overview()

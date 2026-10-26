@@ -106,6 +106,7 @@ var progress_bar: ProgressBar
 var undo_button: Button
 var speed_button: Button
 var sound_button: Button
+var _web_settings_save_pending := false
 var pause_button: Button
 var dock_button: Button
 var shop: Control
@@ -154,6 +155,7 @@ func _ready() -> void:
     heading.font_weight = 800
     _build_scene()
     _build_ui()
+    _web_settings_debug_setup()
     readable_view = ReadabilityView.new()
     add_child(readable_view)
     readable_view.setup(self)
@@ -1958,6 +1960,9 @@ func _screen_position(world_position: Vector3, section := "yard") -> Vector2:
     return camera.unproject_position(world_position)
 
 func _input(event: InputEvent) -> void:
+    if OS.has_feature("web") and paused and is_instance_valid(modal) and modal.visible and (event is InputEventScreenTouch or event is InputEventMouseButton):
+        var hovered := get_viewport().gui_get_hovered_control()
+        print("WEB_SETTINGS_POINTER t=",Time.get_ticks_msec()," event=",event.get_class()," device=",event.device," pressed=",event.pressed," pos=",event.position," hovered=",str(hovered.get_path()) if hovered != null else "none"," effects_rect=",sound_button.get_global_rect()," music_rect=",ui.get_meta("music_toggle").get_global_rect())
     if event is InputEventKey and event.pressed and not event.echo:
         match event.keycode:
             KEY_SPACE: _toggle_pause()
@@ -2109,6 +2114,9 @@ func _notification(what: int) -> void:
 
 func _save_progress() -> void:
     var error := _store_progress()
+    if _web_settings_save_pending:
+        _web_settings_save_pending = false
+        print("WEB_SETTINGS_STORE t=",Time.get_ticks_msec()," result=",error," sound=",sound_enabled," music=",music_enabled," persistent=",OS.is_userfs_persistent())
     if error != OK:
         push_warning("Progress could not be saved: %s" % error_string(error))
 
@@ -2153,15 +2161,32 @@ func _refresh_audio_settings() -> void:
         soundscape.set_sfx_enabled(sound_enabled and not qa)
         soundscape.set_music_enabled(music_enabled and not qa)
 
+func _web_settings_debug_setup() -> void:
+    if not OS.has_feature("web"):
+        return
+    for key in ["effects","music"]:
+        var button: Button = sound_button if key == "effects" else ui.get_meta("music_toggle")
+        button.button_down.connect(_web_settings_button_trace.bind(key,"down"))
+        button.button_up.connect(_web_settings_button_trace.bind(key,"up"))
+
+func _web_settings_button_trace(key: String, phase: String) -> void:
+    print("WEB_SETTINGS_BUTTON t=",Time.get_ticks_msec()," key=",key," phase=",phase," sound=",sound_enabled," music=",music_enabled)
+
 func _toggle_sound() -> void:
     sound_enabled = not sound_enabled
     _refresh_audio_settings()
+    if OS.has_feature("web"):
+        print("WEB_SETTINGS_TOGGLE t=",Time.get_ticks_msec()," key=effects sound=",sound_enabled," music=",music_enabled," qa=",qa)
+        _web_settings_save_pending = true
     if not qa:
         _save_progress()
 
 func _toggle_music() -> void:
     music_enabled = not music_enabled
     _refresh_audio_settings()
+    if OS.has_feature("web"):
+        print("WEB_SETTINGS_TOGGLE t=",Time.get_ticks_msec()," key=music sound=",sound_enabled," music=",music_enabled," qa=",qa)
+        _web_settings_save_pending = true
     if not qa:
         _save_progress()
 

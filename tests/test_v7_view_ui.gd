@@ -37,6 +37,7 @@ class Fixture:
     var rescue_busy := false
     var helicopter_mode := false
     var failed := false
+    var paused := false
     var won := false
     var stage_active := true
     var balance := 120
@@ -135,6 +136,13 @@ func _run() -> void:
     check(view.road_viewport.world_3d == game.get_world_3d(),"Third road view shares the real world")
     check(View.ROAD_RECT.position.y >= 1260 and View.ROAD_RECT.end.y <= 1440,"Road viewport replaces footer without shrinking depot")
     check(View.YARD_RECT == Rect2(18,616,864,582),"Large readable depot area is preserved")
+    view._process(0)
+    game.paused = true
+    view._process(0)
+    check(view.dock_viewport.render_target_update_mode == SubViewport.UPDATE_ONCE and view.yard_viewport.render_target_update_mode == SubViewport.UPDATE_ONCE and view.road_viewport.render_target_update_mode == SubViewport.UPDATE_ONCE,"Pause captures each final3D pose once instead of repeatedly rendering unchanged views")
+    game.paused = false
+    view._process(0)
+    check(view.dock_viewport.render_target_update_mode == SubViewport.UPDATE_ALWAYS and view.yard_viewport.render_target_update_mode == SubViewport.UPDATE_ALWAYS,"Resume reactivates actual3D rendering")
     var actor := Node3D.new()
     actor.position = Vector3(10,0,9)
     game.add_child(actor)

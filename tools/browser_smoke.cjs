@@ -13,9 +13,10 @@ function option(name, fallback) {
 const url = option('--url', process.env.BASE_URL || 'http://127.0.0.1:8765/');
 const output = path.resolve(option('--output-dir', 'ci-results/browser'));
 fs.mkdirSync(output, { recursive: true });
-const evidence = {url, emulation:{width:390,height:844,dpr:1,hasTouch:true,isMobile:true}, console:[], pageErrors:[], responses:[], requestFailures:[], checks:[], saves:[], touches:[]};
+const evidence = {url, emulation:{width:390,height:844,dpr:1,hasTouch:true,isMobile:true}, console:[], pageErrors:[], responses:[], requestFailures:[], checks:[], saves:[], touches:[], inputEvents:[], environments:[]};
 const persist = () => fs.writeFileSync(path.join(output,'evidence.json'), JSON.stringify(evidence,null,2));
 let browser;
+let page;
 let phase = 'boot';
 async function readSave(page) {
  return page.evaluate(async () => {
@@ -51,6 +52,7 @@ async function pollSave(page, predicate, description) {
   if(saved && predicate(saved.text)) return saved;
   await page.waitForTimeout(500);
  }
+ if(saved) {recordSave('failure-last',saved); evidence.failedPredicate={phase,description};persist();}
  throw new Error(description+' (no matching persisted save within30s; last='+String(saved?.text).slice(0,180)+')');
 }
 function statuses(text) {return [...text.matchAll(/"status"\s*:\s*"([^"]+)"/g)].map(match=>match[1]);}
@@ -74,7 +76,23 @@ async function check(name, operation) {
  if(process.env.PLAYWRIGHT_EXECUTABLE_PATH) launch.executablePath=process.env.PLAYWRIGHT_EXECUTABLE_PATH;
  browser=await chromium.launch(launch);
  const context=await browser.newContext({viewport:{width:390,height:844},hasTouch:true,isMobile:true,deviceScaleFactor:1});
- const page=await context.newPage();
+ await context.addInitScript(()=>{
+  // Passive, capture-only observation: never cancel, synthesize or modify input.
+  for(const type of ['touchstart','touchend','touchcancel','pointerdown','pointerup','mousedown','mouseup','click']) {
+   document.addEventListener(type,event=>{
+    const points=Array.from(event.changedTouches||[]).map(touch=>({id:touch.identifier,x:touch.clientX,y:touch.clientY,force:touch.force}));
+    console.debug('__BROWSER_SMOKE_INPUT__'+JSON.stringify({
+     type:event.type,eventClass:event.constructor.name,isTrusted:event.isTrusted,
+     at:new Date().toISOString(),timeStamp:event.timeStamp,
+     x:event.clientX,y:event.clientY,button:event.button,buttons:event.buttons,
+     pointerType:event.pointerType,pointerId:event.pointerId,
+     sourceFiresTouch:event.sourceCapabilities?.firesTouchEvents,
+     target:{tag:event.target?.tagName,id:event.target?.id},points
+    }));
+   },{capture:true,passive:true});
+  }
+ });
+ page=await context.newPage();
  page.setDefaultTimeout(120000);
  const cdp=await context.newCDPSession(page);
  const renderedFrames=async()=>{
@@ -101,11 +119,30 @@ async function check(name, operation) {
   await renderedFrames();
   entry.elapsedMs=Date.now()-started;persist();
  };
- page.on('console',message=>{evidence.console.push({phase,type:message.type(),text:message.text()});persist();});
+ page.on('console',message=>{
+  const text=message.text();
+  if(text.startsWith('__BROWSER_SMOKE_INPUT__')) {
+   try {evidence.inputEvents.push({phase,...JSON.parse(text.slice('__BROWSER_SMOKE_INPUT__'.length))});}
+   catch(error){evidence.inputEvents.push({phase,parseError:String(error),text});}
+  } else {evidence.console.push({phase,type:message.type(),text});}
+  persist();
+ });
  page.on('pageerror',error=>{evidence.pageErrors.push({phase,error:String(error)});persist();});
  page.on('response',response=>{evidence.responses.push({phase,url:response.url(),status:response.status()});persist();});
  page.on('requestfailed',request=>{evidence.requestFailures.push({phase,url:request.url(),error:request.failure()});persist();});
  const screenshot=name=>page.screenshot({path:path.join(output,name+'.png')});
+ const environment=async(label)=>{
+  const actual=await page.evaluate(()=>{
+   const canvas=document.getElementById('canvas');
+   const rect=canvas?.getBoundingClientRect();
+   return {userAgent:navigator.userAgent,platform:navigator.platform,maxTouchPoints:navigator.maxTouchPoints,
+    dpr:devicePixelRatio,innerWidth,innerHeight,screen:{width:screen.width,height:screen.height},
+    visualViewport:visualViewport?{width:visualViewport.width,height:visualViewport.height,scale:visualViewport.scale,offsetLeft:visualViewport.offsetLeft,offsetTop:visualViewport.offsetTop}:null,
+    canvas:canvas?{width:canvas.width,height:canvas.height,css:rect?.toJSON()}:null,
+    visibility:document.visibilityState};
+  });
+  evidence.environments.push({phase,label,at:new Date().toISOString(),...actual});persist();
+ };
  const boot=async()=>{
   await page.locator('#play').tap();
   await page.waitForFunction(()=>document.documentElement.dataset.gameReady==='true',null,{timeout:120000});
@@ -116,6 +153,7 @@ async function check(name, operation) {
  await screenshot('00-launch');
  await check('shell Spela starts real Godot canvas',boot);
  await screenshot('01-harbor-menu');
+ await environment('harbor-ready');
  phase='real-touch';
  await touch(195,674,'start-stage1'); // Actual Spela bana1 button, inside letterboxed900×1440 canvas.
  await page.waitForTimeout(1000);
@@ -128,14 +166,18 @@ async function check(name, operation) {
  phase='pause-settings';
  await touch(361,136,'pause');
  await screenshot('03-paused');
+ await environment('pause-before-effects');
  const beforeMute=await pollSave(page,activeStageOne,'Pause must retain active campaign');
  assert.equal(setting(beforeMute.text,'sound'),true,'Fresh isolated profile starts with effects enabled');
  assert.equal(setting(beforeMute.text,'music'),true,'Fresh isolated profile starts with music enabled');
  await touch(105,536,'effects-off'); // Real effects button; never blindly retry a toggle.
+ await screenshot('04a-immediately-after-effects-touch');
+ await environment('after-effects-touch');
  await check('effects button persists sound=false before next touch',async()=>{
   const saved=await pollSave(page,text=>activeStageOne(text)&&setting(text,'sound')===false,'Effects touch must persist sound=false');recordSave('save-effects-off',saved);
  });
  await touch(265,536,'music-off'); // Only after the previous mutation is observed.
+ await screenshot('04b-immediately-after-music-touch');
 
  await check('actual pause buttons persist both sound settings off',async()=>{
   const saved=await pollSave(page,text=>activeStageOne(text)&&muted(text),'Mute buttons must reach actual ConfigFile settings');recordSave('save-before-reload',saved);
@@ -163,6 +205,13 @@ async function check(name, operation) {
  assert.deepEqual(fatalConsole,[],'No Godot/script/audio/resource errors');
  evidence.ok=true;persist();
  console.log('WEB_BROWSER_SMOKE_OK: real mobile touch dispatch, pause mute, IndexedDB save/reload, no runtime/resource/network errors');
-})().catch(error=>{
+})().catch(async error=>{
  evidence.ok=false;evidence.failure=String(error.stack||error);persist();console.error(error);process.exitCode=1;
+ if(page && !page.isClosed()) {
+  try {await page.screenshot({path:path.join(output,'failure-screen.png')});}
+  catch(diagnosticError){evidence.failureScreenshotError=String(diagnosticError);}
+  try {const saved=await readSave(page);if(saved)recordSave('failure-last',saved);}
+  catch(diagnosticError){evidence.failureSaveError=String(diagnosticError);}
+ }
+ persist();
 }).finally(async()=>{if(browser)await browser.close();persist();});
