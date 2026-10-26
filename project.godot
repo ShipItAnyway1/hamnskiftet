@@ -1,0 +1,28 @@
+config_version=5
+
+[application]
+config/name="Hamnskiftet · Lastbilspussel"
+config/icon="res://assets/art/app-icon.svg"
+boot_splash/show_image=false
+run/main_scene="res://main.tscn"
+config/features=PackedStringArray("4.6", "GL Compatibility")
+
+[display]
+window/size/viewport_width=900
+window/size/viewport_height=1440
+window/size/window_width_override=630
+window/size/window_height_override=1008
+window/stretch/mode="viewport"
+window/stretch/aspect="keep"
+window/handheld/orientation=1
+
+[rendering]
+renderer/rendering_method="gl_compatibility"
+textures/default_filters/use_nearest_mipmap_filter=false
+textures/vram_compression/import_etc2_astc=true
+textures/vram_compression/import_s3tc_bptc=true
+environment/defaults/default_clear_color=Color(0.08,0.17,0.24,1)
+anti_aliasing/quality/msaa_3d=2
+
+[audio]
+driver/enable_input=false

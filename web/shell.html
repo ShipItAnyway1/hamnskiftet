@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="sv">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#091e35">
+  <meta name="description" content="Hamnskiftet: planera lastbilarna, matcha godset och håll hamnen i rörelse. Spela direkt i mobilen.">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Hamnskiftet · Spela</title>
+  <style>
+    * { box-sizing:border-box; }
+    html,body { margin:0; width:100%; height:100%; background:#071526; overflow:hidden; overscroll-behavior:none; }
+    body { color:#f5faff; font-family:system-ui,-apple-system,sans-serif; touch-action:none; }
+    #canvas { display:block; width:100%; height:100%; outline:0; }
+    #launch { position:fixed; inset:0; display:grid; place-items:center; padding:24px; background:radial-gradient(ellipse at 50% 15%,#146a86 0,transparent 60%),linear-gradient(160deg,#103b60,#071526 75%); }
+    .card { width:min(100%,390px); text-align:center; padding:30px 22px 24px; border:1px solid #3b7595; border-radius:28px; background:#0b2748e8; box-shadow:0 22px 80px #0006; }
+    .mark { width:112px; height:112px; margin:0 auto 24px; }
+    .eyebrow { color:#71e5ea; font-weight:750; font-size:12px; letter-spacing:.16em; }
+    h1 { font-size:clamp(27px,7.4vw,34px); margin:9px 0 12px; letter-spacing:-.04em; }
+    .intro { color:#c1d9ed; line-height:1.55; margin:0 0 24px; font-size:16px; }
+    button { width:100%; min-height:57px; background:#ffdc48; color:#102d4c; border:2px solid #fff19d; border-radius:16px; font:800 20px system-ui; box-shadow:0 5px 0 #bc8c20; cursor:pointer; }
+    button:focus-visible { outline:3px solid #69eaf5; outline-offset:5px; }
+    button:disabled { cursor:wait; background:#e4c650; }
+    progress { display:none; margin-top:24px; width:100%; height:9px; accent-color:#4ce3d3; }
+    #notice { min-height:36px; font-size:13px; line-height:1.45; color:#9fbdd7; margin:20px 0 0; }
+    .error { color:#ffbd9b!important; }
+    @media (max-height:540px) { .card { padding:18px; } .mark { width:65px; height:65px; margin-bottom:10px; } .intro { margin-bottom:16px; } }
+  </style>
+  $GODOT_HEAD_INCLUDE
+</head>
+<body>
+  <canvas id="canvas" tabindex="0" aria-label="Hamnskiftets spelplan">Din webbläsare behöver stöd för canvas.</canvas>
+  <main id="launch">
+    <section class="card">
+      <svg class="mark" viewBox="0 0 112 112" aria-hidden="true"><rect x="2" y="2" width="108" height="108" rx="28" fill="#2abbd3" stroke="#7ceaf0" stroke-width="3"/><path d="M13 82h86" stroke="#102c48" stroke-width="9" stroke-linecap="round"/><rect x="16" y="31" width="48" height="44" rx="6" fill="#ffdc48"/><path d="M66 45h17l13 15v16H66Z" fill="#ffdc48"/><path d="M72 50h10l9 12H72Z" fill="#174d78"/><rect x="24" y="39" width="32" height="5" rx="2" fill="#fff2af"/><circle cx="34" cy="78" r="11" fill="#0b2946"/><circle cx="34" cy="78" r="5" fill="#d0ecf4"/><circle cx="81" cy="78" r="11" fill="#0b2946"/><circle cx="81" cy="78" r="5" fill="#d0ecf4"/></svg>
+      <div class="eyebrow">DITT SKIFT BÖRJAR HÄR</div>
+      <h1>HAMNSKIFTET</h1>
+      <p class="intro">Rätt lastbil. Rätt gods.<br>Håll hamnen i rörelse.</p>
+      <button id="play" type="button">Spela</button>
+      <progress id="progress" aria-label="Spelet laddas"></progress>
+      <p id="notice" aria-live="polite">Spela i stående läge.<br>Dina framsteg sparas i den här webbläsaren.</p>
+      <noscript>Aktivera JavaScript för att spela.</noscript>
+    </section>
+  </main>
+  <script src="$GODOT_URL"></script>
+  <script>
+    const GODOT_CONFIG = $GODOT_CONFIG;
+    const engine = new Engine(GODOT_CONFIG);
+    const play = document.getElementById('play');
+    const progress = document.getElementById('progress');
+    const notice = document.getElementById('notice');
+    const canvas = document.getElementById('canvas');
+    canvas.addEventListener('contextmenu', event => event.preventDefault());
+    play.addEventListener('click', async () => {
+      play.disabled = true;
+      play.textContent = 'Laddar hamnen…';
+      progress.style.display = 'block';
+      notice.textContent = 'Första starten laddar ned spelet. Det kan ta en liten stund.';
+      try {
+        const missing = Engine.getMissingFeatures({threads:$GODOT_THREADS_ENABLED});
+        if (missing.length) throw new Error('Webbläsaren saknar: '+missing.join(', '));
+        await engine.startGame({canvas, onProgress(current,total) {
+          if (total > 0) { progress.max = total; progress.value = current; }
+          else progress.removeAttribute('value');
+        }});
+        document.getElementById('launch').remove();
+        canvas.focus({preventScroll:true});
+        document.documentElement.dataset.gameReady = 'true';
+      } catch (error) {
+        console.error(error);
+        notice.textContent = 'Spelet kunde inte starta. Ladda om sidan eller prova en uppdaterad Safari eller Chrome.';
+        notice.classList.add('error');
+        progress.style.display = 'none';
+        play.textContent = 'Försök igen';
+        play.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

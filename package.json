@@ -1,0 +1,8 @@
+{
+  "name": "hamnskiftet-web-qa",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Browser smoke tests for the exported Godot game",
+  "scripts": {"smoke:web": "node tools/browser_smoke.cjs"},
+  "devDependencies": {"playwright": "1.62.1"}
+}

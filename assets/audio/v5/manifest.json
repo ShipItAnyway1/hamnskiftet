@@ -1,0 +1,175 @@
+{
+  "title": "Hamnskiftet / Harbor Groove",
+  "original": true,
+  "bpm": 96,
+  "key": "D major / extended jazz voicings",
+  "bars": 24,
+  "generator": "generate-truck-audio-v5.py",
+  "seed": 218005,
+  "instruments": [
+    "struck-wood marimba",
+    "hammered electric-piano model",
+    "warm plucked bass",
+    "soft kick",
+    "brush snare",
+    "swung shaker"
+  ],
+  "notes": "Procedural composition and sound design, no external samples. Perceptual quality needs human audition; numeric checks do not prove musical quality.",
+  "files": {
+    "harbor_groove": {
+      "seconds": 60.0,
+      "channels": 2,
+      "sample_rate": 32000,
+      "peak": 0.82,
+      "rms_dbfs": -17.05,
+      "loop": true,
+      "sha256": "932a6ab0c7c2430ec7107339e5c9e6f1be7db29b14e8b874e629a8c3d8162f19",
+      "boundary_delta": 0.002374
+    },
+    "engine_start": {
+      "seconds": 1.0,
+      "channels": 1,
+      "sample_rate": 32000,
+      "peak": 0.8,
+      "rms_dbfs": -12.83,
+      "loop": false,
+      "sha256": "ee61e562b2dfd458944a4896f3e1ec38f289fa339698cd37fb19cac1f6b977ff"
+    },
+    "drive_loop": {
+      "seconds": 2.0,
+      "channels": 1,
+      "sample_rate": 32000,
+      "peak": 0.68,
+      "rms_dbfs": -8.7,
+      "loop": true,
+      "sha256": "fe2fb81f2833bb6735d7e9cca5c8db1ec98030fb593015fb2851a84e6e5daeb3",
+      "boundary_delta": 0.023046
+    },
+    "air_brake": {
+      "seconds": 0.58,
+      "channels": 1,
+      "sample_rate": 32000,
+      "peak": 0.66,
+      "rms_dbfs": -24.45,
+      "loop": false,
+      "sha256": "8ace053614be0aebe8c56e034a04ab17d9a7d29b23b6f2de2d1fcde5a77f67b4"
+    },
+    "dock": {
+      "seconds": 0.65,
+      "channels": 2,
+      "sample_rate": 32000,
+      "peak": 0.8,
+      "rms_dbfs": -19.05,
+      "loop": false,
+      "sha256": "e22b5e192f815e449406092fbb99c51af696efa078489e12dd46bdc2f5ed1cb7"
+    },
+    "click": {
+      "seconds": 0.12,
+      "channels": 1,
+      "sample_rate": 32000,
+      "peak": 0.6,
+      "rms_dbfs": -12.69,
+      "loop": false,
+      "sha256": "88140a99aee3b8c9a6255f80d7d75be7927a54fd87b343f4adc233dc1399c188"
+    },
+    "blocked": {
+      "seconds": 0.28,
+      "channels": 2,
+      "sample_rate": 32000,
+      "peak": 0.65,
+      "rms_dbfs": -14.29,
+      "loop": false,
+      "sha256": "44de1f5a6df315635ede6810948af3d0fa97300e4009463cce50ae2ea2a06400"
+    },
+    "purchase": {
+      "seconds": 0.9,
+      "channels": 2,
+      "sample_rate": 32000,
+      "peak": 0.75,
+      "rms_dbfs": -16.26,
+      "loop": false,
+      "sha256": "7f09107a75d0bb7fb8a260658ec5dd36c792ad93be032cb074626d8bb08e9e34"
+    },
+    "win": {
+      "seconds": 2.1,
+      "channels": 2,
+      "sample_rate": 32000,
+      "peak": 0.8,
+      "rms_dbfs": -17.18,
+      "loop": false,
+      "sha256": "7cef5694ebccfd6547c19aee7aadb7f9dd4fb5706beb675bac54595f050ae624"
+    },
+    "gate": {
+      "seconds": 0.78,
+      "channels": 1,
+      "sample_rate": 32000,
+      "peak": 0.74,
+      "rms_dbfs": -19.67,
+      "loop": false,
+      "sha256": "cfdb5f4108a3c355c7182fdb144860f97ba237bb129982f6bb34c955ec2dc742"
+    },
+    "load_kyl": {
+      "seconds": 0.6,
+      "channels": 2,
+      "sample_rate": 32000,
+      "peak": 0.8,
+      "rms_dbfs": -16.67,
+      "loop": false,
+      "sha256": "5840460d01b8c44ef207f3ff1df938131c9cf4b37d5f3fe0db82b437ca127923"
+    },
+    "load_frys": {
+      "seconds": 0.68,
+      "channels": 2,
+      "sample_rate": 32000,
+      "peak": 0.8,
+      "rms_dbfs": -19.76,
+      "loop": false,
+      "sha256": "e8656ec5724af7612d7489b924705a282ce56285fa69e7cd711f1d41e73c17dc"
+    },
+    "load_schakt": {
+      "seconds": 0.75,
+      "channels": 2,
+      "sample_rate": 32000,
+      "peak": 0.8,
+      "rms_dbfs": -19.21,
+      "loop": false,
+      "sha256": "e2d5c2ff484caffe463e5890e51d12b243532e351669ecbbb1cbdad3411f1aca"
+    },
+    "load_adr": {
+      "seconds": 0.74,
+      "channels": 2,
+      "sample_rate": 32000,
+      "peak": 0.8,
+      "rms_dbfs": -17.01,
+      "loop": false,
+      "sha256": "85ec7a439102a2b39eb23bfdafe2d2d993c4f1935ff6142c5d2aee3a3ec63f4a"
+    },
+    "load_timmer": {
+      "seconds": 0.7,
+      "channels": 2,
+      "sample_rate": 32000,
+      "peak": 0.8,
+      "rms_dbfs": -13.63,
+      "loop": false,
+      "sha256": "a683080e87becba0efdfc8bf3782197b90f8bab9ae7821a09c10ad11de89ecb8"
+    },
+    "load_bransle": {
+      "seconds": 0.78,
+      "channels": 1,
+      "sample_rate": 32000,
+      "peak": 0.75,
+      "rms_dbfs": -18.15,
+      "loop": false,
+      "sha256": "83bd8dbea6495611c48ec39808e139d33b17550d72ab767af2070165f4b48006"
+    },
+    "music_preview_15s": {
+      "seconds": 15.0,
+      "channels": 2,
+      "sample_rate": 32000,
+      "peak": 0.82,
+      "rms_dbfs": -17.08,
+      "loop": false,
+      "sha256": "9daaa08c7c5c06a86627d46d81736685086732c566b71204e32d5755db738b40"
+    }
+  }
+}

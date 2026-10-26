@@ -1,0 +1,93 @@
+name: Testa och publicera spelet
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GODOT_VERSION: 4.6.2
+
+jobs:
+  test-and-build:
+    name: Speltester och mobilwebb
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pages: read
+    steps:
+      - name: Hämta spelkoden
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Installera verifierad Godot
+        shell: bash
+        run: |
+          archive="Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          release="https://github.com/godotengine/godot-builds/releases/download/${GODOT_VERSION}-stable"
+          mkdir -p "$RUNNER_TEMP/godot-editor"
+          cd "$RUNNER_TEMP/godot-editor"
+          curl --fail --location --retry 3 "$release/$archive" -o "$archive"
+          curl --fail --location --retry 3 "$release/SHA512-SUMS.txt" -o SHA512-SUMS.txt
+          grep -F " $archive" SHA512-SUMS.txt | sha512sum --check --strict
+          unzip -q "$archive"
+          install -m 755 "Godot_v${GODOT_VERSION}-stable_linux.x86_64" "$RUNNER_TEMP/godot"
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
+      - name: Kontrollera spelets regler och kontroller
+        run: python3 tools/run_ci.py --log-dir ci-results
+      - name: Hämta den versionslåsta webbexportmallen
+        run: python3 tools/fetch_web_template.py --version "$GODOT_VERSION"
+      - name: Bygg webbversionen
+        run: |
+          mkdir -p build/web
+          godot --headless --path . --log-file "$PWD/ci-results/web-export.godot.log" --export-release Web build/web/index.html 2>&1 | tee ci-results/web-export.stdout.log
+          python3 tools/check_web_build.py --build-dir build/web --log ci-results/web-export.stdout.log
+      - name: Installera webbläsartestet
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npx playwright install --with-deps chromium
+      - name: Provspela den exporterade mobilwebben
+        run: |
+          python3 -m http.server 8765 --bind 127.0.0.1 --directory build/web > ci-results/web-server.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid"' EXIT
+          node tools/browser_smoke.cjs
+      - name: Spara testloggar
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: testloggar
+          path: ci-results/
+          retention-days: 7
+      - name: Förbered GitHub Pages
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+      - name: Ladda upp det testade spelet
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: build/web
+
+  deploy:
+    name: Publicera spellänken
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    needs: test-and-build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.publish.outputs.page_url }}
+    steps:
+      - name: Publicera
+        id: publish
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
