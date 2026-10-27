@@ -19,11 +19,13 @@ func _run() -> void:
     game.add_child(view)
     view.setup(game)
     view.configure({"campaign":true,"config":{"spawn_bounds":Rect2i(5,5,8,10),"types":["kyl","frys"]}})
-    for dimensions in [Vector2(900,1600),Vector2(900,1948),Vector2(900,2100),Vector2(1200,1600),Vector2(1948,900),Vector2(900,900)]:
+    for dimensions in [Vector2(900,1600),Vector2(900,1948),Vector2(900,2100),Vector2(900,1200),Vector2(1200,1600),Vector2(1948,900),Vector2(900,900)]:
         view.reflow(dimensions)
         var canvas := Rect2(Vector2.ZERO,dimensions)
         for region in [view.dock_rect,view.yard_rect,view.road_rect]:
             check(canvas.encloses(region) and region.has_area(),"Every real camera region fits "+str(dimensions))
+        if dimensions == Vector2(900,1200):
+            check(view.dock_rect.end.y < view.yard_rect.position.y and view.dock_rect.size.x > 850,"Portrait tablet keeps a wide readable conveyor rather than a narrow view of the entire harbor")
         check(not view.dock_rect.intersects(view.yard_rect),"Loading and yard do not overlap")
         check(not view.yard_rect.intersects(view.road_rect),"Road strip does not cover the yard")
         check(view.dock_texture.get_rect() == view.dock_rect and view.yard_texture.get_rect() == view.yard_rect,"Draw and hit-test regions use the same rects")

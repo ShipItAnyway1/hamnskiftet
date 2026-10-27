@@ -12,13 +12,13 @@ static func areas(canvas: Vector2) -> Dictionary:
     var context := Rect2(margin,road.position.y-84,width-margin*2,68)
     var dock: Rect2
     var yard: Rect2
-    if landscape or height < 1350:
+    if landscape or height < 1100:
         var top := 236.0
         var split := floorf(width*.42)
         dock = Rect2(margin,top,split-margin*2,context.position.y-top-18)
         yard = Rect2(split+margin,top,width-split-margin*2,context.position.y-top-18)
     else:
-        var dock_height := clampf(height*.285,400,560)
+        var dock_height := clampf(height*.285,320,560)
         dock = Rect2(margin,200,width-margin*2,dock_height)
         var yard_top := dock.end.y+52
         yard = Rect2(margin,yard_top,width-margin*2,context.position.y-yard_top-18)
