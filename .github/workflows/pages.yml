@@ -25,14 +25,12 @@ jobs:
     permissions:
       contents: read
     steps:
+      - name: Hämta spelkoden
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Starta jobblogg
         run: |
           mkdir -p ci-results
           printf 'job=build\nsha=%s\nrun=%s\nattempt=%s\n' "$GITHUB_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" > ci-results/job.txt
-      - name: Hämta spelkoden
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          clean: false
       - name: Installera verifierad Godot
         shell: bash
         run: |
@@ -83,14 +81,12 @@ jobs:
     permissions:
       contents: read
     steps:
+      - name: Hämta samma spelkod
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Starta jobblogg
         run: |
           mkdir -p ci-results
           printf 'job=full-browser\nsha=%s\nrun=%s\nattempt=%s\n' "$GITHUB_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" > ci-results/job.txt
-      - name: Hämta samma spelkod
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          clean: false
       - name: Hämta kandidatbyggnaden från denna körning
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
@@ -111,9 +107,12 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
+          mkdir -p ci-results
           python3 -m http.server 8765 --bind 127.0.0.1 --directory build/web > ci-results/web-server.log 2>&1 &
           server_pid=$!
           trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          curl --fail --silent --show-error --retry 10 --retry-connrefused --retry-delay 1 --max-time 3 http://127.0.0.1:8765/build-info.json > ci-results/served-build-info.json
+          python3 -c 'import json,os; assert json.load(open("ci-results/served-build-info.json"))["commit"] == os.environ["GITHUB_SHA"]'
           node tools/browser_smoke.cjs 2>&1 | tee ci-results/browser-smoke.stdout.log
       - name: Spara fullständiga webbläsarloggar och bilder även vid fel
         if: always()
@@ -142,16 +141,14 @@ jobs:
           - landscape-and-rotation
           - safe-area-390x844
     steps:
+      - name: Hämta samma spelkod
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Starta jobblogg
         env:
           MATRIX_CASE: ${{ matrix.case }}
         run: |
           mkdir -p ci-results
           printf 'job=mobile\ncase=%s\nsha=%s\nrun=%s\nattempt=%s\n' "$MATRIX_CASE" "$GITHUB_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" > ci-results/job.txt
-      - name: Hämta samma spelkod
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          clean: false
       - name: Hämta kandidatbyggnaden från denna körning
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
@@ -173,9 +170,12 @@ jobs:
           MATRIX_CASE: ${{ matrix.case }}
         run: |
           set -o pipefail
+          mkdir -p ci-results
           python3 -m http.server 8765 --bind 127.0.0.1 --directory build/web > ci-results/web-server.log 2>&1 &
           server_pid=$!
           trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          curl --fail --silent --show-error --retry 10 --retry-connrefused --retry-delay 1 --max-time 3 http://127.0.0.1:8765/build-info.json > ci-results/served-build-info.json
+          python3 -c 'import json,os; assert json.load(open("ci-results/served-build-info.json"))["commit"] == os.environ["GITHUB_SHA"]'
           node tools/browser_mobile_layout.cjs --cases "$MATRIX_CASE" 2>&1 | tee ci-results/mobile.stdout.log
       - name: Spara mobilvyns loggar och bilder även vid fel
         if: always()
