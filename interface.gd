@@ -241,6 +241,7 @@ static func _modal(game) -> void:
     # This group is independent of the legacy test controls above.
     var help := Control.new()
     help.name = "PauseHelp"
+    help.mouse_filter = Control.MOUSE_FILTER_PASS
     help.position = Vector2(34,486)
     help.size = Vector2(692,590)
     card.add_child(help)
@@ -300,6 +301,7 @@ static func _fit_overlay(overlay: Control, card: Control, viewport_size: Vector2
     scroller.position = (viewport_size-extent)*.5
     scroller.size = extent
     card.position = Vector2.ZERO
+    card.mouse_filter = Control.MOUSE_FILTER_PASS
     card.custom_minimum_size = card.size
     card.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
     # Swiping scrolls on touchscreens; keyboard focus also reveals offscreen
@@ -500,6 +502,7 @@ static func _shop(game) -> void:
     for extra in range(2):
         var bay: int = 3+extra
         var tile := panel(game,card,Vector2(30+float(extra)*372,274),Vector2(352,438),Color("1b4c7d"),25,5)
+        tile.mouse_filter = Control.MOUSE_FILTER_PASS
         _label(game,tile,"KAJ 04" if extra == 0 else "KAJ 05",Vector2(20,15),Vector2(300,34),25,INK,true)
         _image(tile,Art.harbor_card(extra),Vector2(14,53),Vector2(324,154))
         var description := _label(game,tile,"En extra plats för\ndina leveranser.",Vector2(21,211),Vector2(311,65),25,MUTED)
@@ -536,6 +539,7 @@ Mynten kommer när en full lastbil kör iväg.",Vector2(28,101),Vector2(664,85),
     for index in range(kinds.size()):
         var kind := str(kinds[index])
         var tile := panel(game,card,Vector2(27+float(index%2)*344,214+float(floori(float(index)/2.0))*205),Vector2(322,187),Color("1a4b7b"),20,3)
+        tile.mouse_filter = Control.MOUSE_FILTER_PASS
         var stripe := ColorRect.new()
         stripe.position = Vector2(15,16)
         stripe.size = Vector2(4,62)

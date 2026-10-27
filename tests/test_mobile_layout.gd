@@ -27,6 +27,11 @@ func active_pause(game) -> Array[Button]:
 func reachable(overlay: Control,actions: Array[Button],label: String) -> void:
     var scroll: ScrollContainer = overlay.get_meta("mobile_scroll")
     for action in actions:
+        var ancestor := action.get_parent()
+        while ancestor != scroll:
+            if ancestor is Control:
+                check(ancestor.mouse_filter != Control.MOUSE_FILTER_STOP,label+": card and groups pass finger drags to the scroller")
+            ancestor = ancestor.get_parent()
         check(action.size.x >= 110 and action.size.y >= 110,label+": physical action retains44CSSpx target at360px width")
         scroll.ensure_control_visible(action)
         await settle()

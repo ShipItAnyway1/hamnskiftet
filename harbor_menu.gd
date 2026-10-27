@@ -359,6 +359,9 @@ static func _upgrade_card(game, parent: Control, key: String, position: Vector2)
     var kind := key.trim_prefix("fleet_") if fleet else ""
     var base := Color(str(Layout.COLORS[kind])).darkened(.55) if fleet else Color(str(COLORS[key]))
     var card := _panel(parent,position,Vector2(412,222),base,22)
+    # Card artwork must let finger drags reach UpgradeScroll. Actual purchase
+    # Buttons retain their own input handling.
+    card.mouse_filter = Control.MOUSE_FILTER_PASS
     var title := _label(game,card,str(TITLES[key]),Vector2(55 if fleet else 17,12),Vector2(260 if fleet else 294,34),24,WHITE,true)
     if fleet:
         _artwork(card,Models.icon(kind),Vector2(16,14),Vector2(29,29))

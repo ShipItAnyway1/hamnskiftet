@@ -39,6 +39,8 @@ func _run() -> void:
     var cards: Dictionary = menu.get_meta("upgrade_cards")
     var buttons: Dictionary = menu.get_meta("buttons")
     var scroll: ScrollContainer = menu.get_meta("scroll")
+    for card in cards.values():
+        check(card.mouse_filter == Control.MOUSE_FILTER_PASS,"Finger drags over a card reach the menu scroller")
     for dimensions in FORMATS:
         for with_resume in [true,false]:
             menu.get_meta("resume").visible = with_resume
