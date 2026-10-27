@@ -40,6 +40,7 @@ var helicopter_mode := false
 var rescue_busy := false
 var barrier_states: Dictionary = {}
 var feed_arrivals: Dictionary = {}
+var gestures = preload("res://mobile_gestures.gd").new()
 var readable_view: CanvasLayer
 var traffic := Traffic.new()
 var moving_trucks: Dictionary = {}
@@ -106,7 +107,6 @@ var progress_bar: ProgressBar
 var undo_button: Button
 var speed_button: Button
 var sound_button: Button
-var _web_settings_save_pending := false
 var pause_button: Button
 var dock_button: Button
 var shop: Control
@@ -155,7 +155,6 @@ func _ready() -> void:
     heading.font_weight = 800
     _build_scene()
     _build_ui()
-    _web_settings_debug_setup()
     readable_view = ReadabilityView.new()
     add_child(readable_view)
     readable_view.setup(self)
@@ -350,6 +349,13 @@ func _build_ui() -> void:
     harbor = HarborMenu.build(self)
     ui.add_child(harbor)
     harbor.visible = false
+    HarborMenu.reflow(self)
+    get_viewport().size_changed.connect(HarborMenu.reflow.bind(self))
+    get_viewport().size_changed.connect(gestures.cancel)
+    if OS.has_feature("web"):
+        var reporter = preload("res://web_layout.gd").new()
+        add_child(reporter)
+        reporter.setup(self)
     var artwork_path := "res://assets/art/harbor-hero-v4.png"
     if FileAccess.file_exists(artwork_path):
         var artwork := Image.load_from_file(ProjectSettings.globalize_path(artwork_path))
@@ -360,6 +366,7 @@ func _build_ui() -> void:
 
 func _new_level(index: int, config: Dictionary = {}, restored: Dictionary = {}) -> void:
     generation += 1
+    gestures.cancel()
     failed = false
     helicopter_mode = false
     rescue_busy = false
@@ -1581,7 +1588,7 @@ func _refresh_harbor() -> void:
         var rank := int(upgrades[key])
         var cost := P.cost(key,rank)
         card.get_meta("effect").text = P.effect_text(key,rank)
-        card.get_meta("next_effect").text = "→ "+P.next_effect_text(key,rank)
+        card.get_meta("next_effect").text = P.next_effect_text(key,rank)
         card.get_meta("rank").text = "%d / %d" % [rank,P.max_rank(key)]
         card.get_meta("price").text = "MAX" if cost == 0 else str(cost)
         card.get_meta("buy").text = "Maxnivå" if cost == 0 else ("Uppgradera" if between else "Efter banan")
@@ -1793,7 +1800,7 @@ func _refresh_ui() -> void:
         var delivered_cargo := int(state.get("cargo_delivered",0))
         var empty_slots: int = state.belt.count(null)
         var limit := int(state.get("config",{}).get("belt_limit",L.BELT_SLOTS))
-        ui.get_meta("mission_label").text = "%sORDER  %d / %d pallar   ·   Band: %d pallar, max %d" % ["BOSS · " if bool(state.get("config",{}).get("boss",false)) else "",delivered_cargo,int(state.cargo_total),L.BELT_SLOTS-empty_slots,limit]
+        ui.get_meta("mission_label").text = "%sORDER  %d / %d   ·   PÅ BANDET  %d / %d" % ["BOSS · " if bool(state.get("config",{}).get("boss",false)) else "",delivered_cargo,int(state.cargo_total),L.BELT_SLOTS-empty_slots,limit]
     status_label.visible = (stalled or driving or cargo_focus != "") and not toast_label.visible
     if is_instance_valid(readable_view) and readable_view.legend != null:
         readable_view.legend.visible = not toast_label.visible and not (stalled or driving or cargo_focus != "")
@@ -1852,6 +1859,7 @@ func _toggle_pause() -> void:
     if shop.visible:
         _close_shop()
         return
+    gestures.cancel()
     paused = not paused
     pause_button.text = ">" if paused else "II"
     for tween in active_tweens:
@@ -1960,9 +1968,19 @@ func _screen_position(world_position: Vector3, section := "yard") -> Vector2:
     return camera.unproject_position(world_position)
 
 func _input(event: InputEvent) -> void:
-    if OS.has_feature("web") and paused and is_instance_valid(modal) and modal.visible and (event is InputEventScreenTouch or event is InputEventMouseButton):
-        var hovered := get_viewport().gui_get_hovered_control()
-        print("WEB_SETTINGS_POINTER t=",Time.get_ticks_msec()," event=",event.get_class()," device=",event.device," pressed=",event.pressed," pos=",event.position," hovered=",str(hovered.get_path()) if hovered != null else "none"," effects_rect=",sound_button.get_global_rect()," music_rect=",ui.get_meta("music_toggle").get_global_rect())
+    # Tracked fingers finish even over GUI; a second finger starting outside
+    # the depot cancels the pending truck tap without consuming GUI input.
+    if event is InputEventScreenTouch:
+        if event.pressed and is_instance_valid(readable_view) and not readable_view.yard_rect.has_point(event.position):
+            gestures.cancel()
+        elif gestures.tracks(event.index):
+            _apply_gesture(gestures.process_touch(event,zoom))
+            get_viewport().set_input_as_handled()
+            return
+    elif event is InputEventScreenDrag and gestures.tracks(event.index):
+        _apply_gesture(gestures.process_drag(event,zoom))
+        get_viewport().set_input_as_handled()
+        return
     if event is InputEventKey and event.pressed and not event.echo:
         match event.keycode:
             KEY_SPACE: _toggle_pause()
@@ -1995,8 +2013,24 @@ func _unhandled_input(event: InputEvent) -> void:
             _change_zoom(-.10)
         elif event.button_index == MOUSE_BUTTON_LEFT:
             _pick(event.position)
-    elif event is InputEventScreenTouch and event.pressed:
-        _pick(event.position)
+    elif event is InputEventScreenTouch:
+        if paused or won or failed: return
+        var on_yard: bool = is_instance_valid(readable_view) and readable_view.yard_rect.has_point(event.position)
+        if on_yard:
+            _apply_gesture(gestures.process_touch(event,zoom,true))
+        elif event.pressed:
+            _pick(event.position)
+
+func _apply_gesture(result: Dictionary) -> void:
+    if paused or won or failed:
+        gestures.cancel()
+        return
+    if not is_zero_approx(float(result.zoom_delta)):
+        _change_zoom(float(result.zoom_delta))
+    if result.pan != Vector2.ZERO and is_instance_valid(readable_view):
+        readable_view.pan(result.pan)
+    if result.tap != null:
+        _pick(result.tap)
 
 func _pick(screen_position: Vector2) -> void:
     if paused or won or modal.visible:
@@ -2022,8 +2056,6 @@ func _pick(screen_position: Vector2) -> void:
 
 func _hover_type(screen_position: Vector2) -> void:
     cargo_focus = ""
-    if screen_position.y < 140 or screen_position.y > 1200:
-        return
     var ray := _view_ray(screen_position)
     if ray.is_empty():
         return
@@ -2109,14 +2141,13 @@ func _restore_campaign() -> bool:
     return true
 
 func _notification(what: int) -> void:
+    if what == NOTIFICATION_APPLICATION_FOCUS_OUT:
+        gestures.cancel()
     if what == NOTIFICATION_WM_CLOSE_REQUEST and not qa and not state.is_empty():
         _save_progress()
 
 func _save_progress() -> void:
     var error := _store_progress()
-    if _web_settings_save_pending:
-        _web_settings_save_pending = false
-        print("WEB_SETTINGS_STORE t=",Time.get_ticks_msec()," result=",error," sound=",sound_enabled," music=",music_enabled," persistent=",OS.is_userfs_persistent())
     if error != OK:
         push_warning("Progress could not be saved: %s" % error_string(error))
 
@@ -2161,32 +2192,15 @@ func _refresh_audio_settings() -> void:
         soundscape.set_sfx_enabled(sound_enabled and not qa)
         soundscape.set_music_enabled(music_enabled and not qa)
 
-func _web_settings_debug_setup() -> void:
-    if not OS.has_feature("web"):
-        return
-    for key in ["effects","music"]:
-        var button: Button = sound_button if key == "effects" else ui.get_meta("music_toggle")
-        button.button_down.connect(_web_settings_button_trace.bind(key,"down"))
-        button.button_up.connect(_web_settings_button_trace.bind(key,"up"))
-
-func _web_settings_button_trace(key: String, phase: String) -> void:
-    print("WEB_SETTINGS_BUTTON t=",Time.get_ticks_msec()," key=",key," phase=",phase," sound=",sound_enabled," music=",music_enabled)
-
 func _toggle_sound() -> void:
     sound_enabled = not sound_enabled
     _refresh_audio_settings()
-    if OS.has_feature("web"):
-        print("WEB_SETTINGS_TOGGLE t=",Time.get_ticks_msec()," key=effects sound=",sound_enabled," music=",music_enabled," qa=",qa)
-        _web_settings_save_pending = true
     if not qa:
         _save_progress()
 
 func _toggle_music() -> void:
     music_enabled = not music_enabled
     _refresh_audio_settings()
-    if OS.has_feature("web"):
-        print("WEB_SETTINGS_TOGGLE t=",Time.get_ticks_msec()," key=music sound=",sound_enabled," music=",music_enabled," qa=",qa)
-        _web_settings_save_pending = true
     if not qa:
         _save_progress()
 

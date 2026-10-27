@@ -3,6 +3,6 @@
   "version": "1.0.0",
   "private": true,
   "description": "Browser smoke tests for the exported Godot game",
-  "scripts": {"smoke:web": "node tools/browser_smoke.cjs"},
+  "scripts": {"smoke:web": "node tools/browser_smoke.cjs", "test:mobile": "node tools/browser_mobile_layout.cjs"},
   "devDependencies": {"playwright": "1.62.1"}
 }

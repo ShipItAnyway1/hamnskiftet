@@ -1,6 +1,16 @@
-# Hamnskiftet V7 — order, risk och räddning
+# Hamnskiftet — mobil hamn och lastbilspussel
 
-Lokal Mac-prototyp av ett lastbilspussel i en animerad hamn. [Spela i mobilen eller datorns webbläsare](https://shipitanyway1.github.io/hamnskiftet/). Starta Mac-versionen med `Spela.command`. Native-export till iOS/Android och tester på fysiska telefoner återstår. Alla priser nedan gäller intjänat spelguld; riktiga betalningar och annonser är inte implementerade.
+Spelbar webb- och Mac-prototyp av ett lastbilspussel i en animerad hamn. [Spela i mobilen eller datorns webbläsare](https://shipitanyway1.github.io/hamnskiftet/). Starta Mac-versionen med `Spela.command`. Native-export till iOS/Android och tester på fysiska telefoner återstår. Alla priser nedan gäller intjänat spelguld; riktiga betalningar och annonser är inte implementerade.
+
+## Mobilanpassning
+
+Spelplanen fyller webbläsarens tillgängliga yta utan svarta proportioneringsmarginaler. Layouten följer skärmstorlek, rotation och telefonens säkra kanter. Lastning och depå visas under varandra på höga telefoner och sida vid sida i landskap/kortare format. Text och knappar renderas i skärmens upplösning; tätheten begränsas till 2× för att undvika onödig GPU-belastning.
+
+Huvudknapparna är minst 112 logiska enheter höga, motsvarande minst 44 CSS-pixlar på de kontrollerade telefonformaten. Hamnens uppgraderingar och korta skärmars menyer kan rullas med fingret. Spelstart ligger kvar vid nederkanten. Varorna har större typmärkning utan ändrade kollisioner.
+
+Tryck och släpp en lastbil för att skicka den. Nyp med två fingrar i depån för att zooma; dra med ett finger när du har zoomat in. Nyp tillbaka till minsta zoom för att visa hela depån. Zoomning, dragning, fokusbyte och menytryck ska inte skicka en lastbil av misstag. Datorns mus och hjul fungerar som tidigare.
+
+`test_mobile_layout.gd`, `test_mobile_harbor.gd`, `test_mobile_view.gd`, `test_mobile_gestures.gd` och `test_web_input.gd` kontrollerar menyer, tryckytor, kamerornas projektion efter storleksbyte och gesternas integration med den riktiga spelkontrollen. `tools/browser_mobile_layout.cjs` kör den exporterade motorn med touch på 360×640,390×844,430×932,768×1024 samt landskap, rotation och säkra kanter. Dessa är webbläsartester; fysisk iPhone/Android har inte verifierats här.
 
 ## Målet och de verkliga felvalen
 
@@ -88,7 +98,7 @@ Aktuella V7-tester körs från workspace-roten med exempelvis:
 
 Mobilen har egen lokal sparning i webbläsaren. Mac-sparfilen överförs inte automatiskt. Ljudet aktiveras efter ett tryck i spelet. Webbversionen använder en tråd och kräver inga särskilda isoleringsheaders eller installation från en appbutik.
 
-Varje push till `main` kör Actions: isolerad import och åtta aktuella tester, en riktig Godot-webbexport, paketeringskontroll och ett mobilanpassat webbläsartest. Bara ett godkänt bygge publiceras till GitHub Pages. Pull requests kör kontrollerna utan att publiceras. Versioner och officiella Actions är låsta; `build-info.json` vid spellänken anger exakt publicerad commit och filhashar.
+Varje push till `main` kör Actions: isolerad import och tolv aktuella tester, en riktig Godot-webbexport, paketeringskontroll och riktiga touchtester över flera mobilformat. Bara ett godkänt bygge publiceras till GitHub Pages. Pull requests kör kontrollerna utan att publiceras. Versioner och officiella Actions är låsta; `build-info.json` vid spellänken anger exakt publicerad commit och filhashar.
 
 Lokal kontroll och webbexport från repots rot:
 

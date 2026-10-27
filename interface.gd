@@ -106,24 +106,25 @@ static func build(game) -> void:
     game.ui.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
     game.ui.mouse_filter = Control.MOUSE_FILTER_IGNORE
     layer.add_child(game.ui)
-    var top := panel(game,game.ui,Vector2(18,14),Vector2(864,96),Color("102f57"),24,8)
-    _image(top,Art.icon("truck"),Vector2(15,15),Vector2(62,62))
-    _label(game,top,"HAMNSKIFTET",Vector2(91,9),Vector2(235,40),30,INK,true)
-    game.title_label = _label(game,top,"Morgonpasset · depå 01",Vector2(93,51),Vector2(235,29),21,MUTED)
-    var rescue_button := _button(game,top,"Heli",Vector2(326,19),Vector2(100,56),func(): game.call("_toggle_rescue"),true,"",22)
+    var top := panel(game,game.ui,Vector2(18,6),Vector2(864,120),Color("102f57"),24,5)
+    game.ui.set_meta("top_hud",top)
+    _label(game,top,"HAMNSKIFTET",Vector2(14,15),Vector2(246,35),29,INK,true)
+    game.title_label = _label(game,top,"Bana 1 · Morgonskiftet",Vector2(14,61),Vector2(246,32),24,MUTED)
+    game.title_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+    var rescue_button := _button(game,top,"Heli",Vector2(458,4),Vector2(128,112),func(): game.call("_toggle_rescue"),true,"",30)
     rescue_button.tooltip_text = "Rädda en vald lastbil · första gången gratis"
     game.ui.set_meta("rescue_button",rescue_button)
-    var mission := _label(game,game.ui,"ORDER  0 / 0 varor",Vector2(23,111),Vector2(854,26),21,Color("b5eafa"),true)
+    var mission := _label(game,game.ui,"ORDER  0 / 0 varor",Vector2(22,128),Vector2(856,34),30,Color("b5eafa"),true)
     mission.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
     game.ui.set_meta("mission_label",mission)
-    var cargo_button := _button(game,top,"Gods",Vector2(437,19),Vector2(117,56),func(): game.call("_open_cargo_legend"),false,"cargo",20)
+    var cargo_button := _button(game,top,"Gods",Vector2(598,4),Vector2(112,112),func(): game.call("_open_cargo_legend"),false,"",35)
     cargo_button.tooltip_text = "Godstyper, myntvärde och nya leveranser"
     game.ui.set_meta("cargo_legend_button",cargo_button)
-    var wallet := panel(game,top,Vector2(568,13),Vector2(197,67),Color("1c507e"),20,0)
-    _image(wallet,Art.icon("coin"),Vector2(11,13),Vector2(43,43))
-    game.money_label = _label(game,wallet,"120",Vector2(59,8),Vector2(122,49),31,GOLD_INK,true)
+    var wallet := panel(game,top,Vector2(270,20),Vector2(172,74),Color("1c507e"),20,0)
+    _image(wallet,Art.icon("coin"),Vector2(10,18),Vector2(38,38))
+    game.money_label = _label(game,wallet,"120",Vector2(54,11),Vector2(105,49),31,GOLD_INK,true)
     game.money_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-    game.pause_button = _button(game,top,"II",Vector2(783,13),Vector2(62,67),game._toggle_pause,false,"",31)
+    game.pause_button = _button(game,top,"II",Vector2(722,4),Vector2(124,112),game._toggle_pause,false,"",44)
     game.pause_button.tooltip_text = "Paus och välj depå"
 
     var bottom := panel(game,game.ui,Vector2(18,1264),Vector2(864,160),Color("102f57"),24,8)
@@ -138,16 +139,16 @@ static func build(game) -> void:
     incoming.visible = false
     game.ui.set_meta("incoming_count",incoming)
     game.progress_bar = ProgressBar.new()
-    game.progress_bar.position = Vector2(22,49)
+    game.progress_bar.position = Vector2(18,163)
     game.progress_bar.show_percentage = false
     game.progress_bar.add_theme_font_size_override("font_size",1)
     game.progress_bar.add_theme_stylebox_override("background",_style(Color("244d73"),5))
     game.progress_bar.add_theme_stylebox_override("fill",_style(Color("2ed5df"),5))
-    game.progress_bar.size = Vector2(820,9)
-    bottom.add_child(game.progress_bar)
+    game.progress_bar.size = Vector2(864,9)
+    game.ui.add_child(game.progress_bar)
     # The initial theme notification can grow a ProgressBar to the old font
     # height. Apply the slim track after its theme/minimum size has settled.
-    game.progress_bar.set_deferred("size",Vector2(820,9))
+    reflow.call_deferred(game)
     game.undo_button = _button(game,bottom,"Ångra",Vector2(18,77),Vector2(136,64),game._undo,false,"undo",23)
     _button(game,bottom,"Hamn",Vector2(164,77),Vector2(158,64),func(): game.call("_open_harbor"),true,"harbor",24)
     game.dock_button = _button(game,bottom,"Kajer 3 / 5",Vector2(332,77),Vector2(172,64),game._open_shop,false,"dock",22)
@@ -180,14 +181,16 @@ static func build(game) -> void:
     _modal(game)
     _shop(game)
     _cargo_legend(game)
+    game.ui.resized.connect(reflow.bind(game))
+    reflow(game)
 
 static func _backdrop(parent: Node) -> Control:
     var backdrop := Control.new()
-    backdrop.size = Vector2(900,1440)
+    backdrop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
     parent.add_child(backdrop)
     var dim := ColorRect.new()
     dim.color = Color(.015,.045,.12,.83)
-    dim.size = backdrop.size
+    dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
     backdrop.add_child(dim)
     return backdrop
 
@@ -238,25 +241,26 @@ static func _modal(game) -> void:
     # This group is independent of the legacy test controls above.
     var help := Control.new()
     help.name = "PauseHelp"
-    help.position = Vector2(34,450)
-    help.size = Vector2(652,362)
+    help.position = Vector2(34,486)
+    help.size = Vector2(692,590)
     card.add_child(help)
-    var undo := _button(game,help,"Ångra · 100 guld",Vector2.ZERO,Vector2(318,70),func(): game.call("_paid_undo"),false,"undo",24)
-    var rescue := _button(game,help,"Heli · 1 gratis",Vector2(334,0),Vector2(318,70),func(): game.call("_toggle_rescue"),true,"",24)
-    var help_balance := _label(game,help,"",Vector2(0,77),Vector2(652,50),21,GOLD_INK,true)
+    var undo := _button(game,help,"Ångra · 100 guld",Vector2.ZERO,Vector2(338,112),func(): game.call("_paid_undo"),false,"undo",24)
+    var rescue := _button(game,help,"Heli · 1 gratis",Vector2(354,0),Vector2(338,112),func(): game.call("_toggle_rescue"),true,"",24)
+    var help_balance := _label(game,help,"",Vector2(0,122),Vector2(692,68),23,GOLD_INK,true)
     help_balance.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     restart.reparent(help)
-    restart.position = Vector2(0,134)
-    restart.size = Vector2(652,64)
+    restart.position = Vector2(0,206)
+    restart.size = Vector2(692,112)
     restart.text = "Börja om · gratis"
+    help.set_meta("restart",restart)
     game.sound_button.reparent(help)
-    game.sound_button.position = Vector2(0,214)
-    game.sound_button.size = Vector2(318,62)
+    game.sound_button.position = Vector2(0,330)
+    game.sound_button.size = Vector2(338,112)
     music.reparent(help)
-    music.position = Vector2(334,214)
-    music.size = Vector2(318,62)
-    var test_toggle := _button(game,help,"Testläge: av",Vector2(0,297),Vector2(318,56),func(): game.call("_toggle_test_mode"),false,"",22)
-    var harbor_button := _button(game,help,"Till hamnen",Vector2(334,297),Vector2(318,56),func(): game.call("_open_harbor"),false,"harbor",22)
+    music.position = Vector2(354,330)
+    music.size = Vector2(338,112)
+    var test_toggle := _button(game,help,"Testläge: av",Vector2(0,454),Vector2(338,112),func(): game.call("_toggle_test_mode"),false,"",22)
+    var harbor_button := _button(game,help,"Till hamnen",Vector2(354,454),Vector2(338,112),func(): game.call("_open_harbor"),false,"harbor",22)
     game.modal.set_meta("pause_help",help)
     game.modal.set_meta("paid_undo",undo)
     game.modal.set_meta("rescue_button",rescue)
@@ -268,28 +272,128 @@ static func _modal(game) -> void:
     game.modal.visible = false
 
 static func configure_modal(game, victory: bool) -> void:
-    var card: Control = game.modal.get_meta("card")
-    var help: Control = game.modal.get_meta("pause_help")
-    var art: TextureRect = game.modal.get_meta("harbor_art")
-    help.visible = not victory
-    if not victory:
-        card.position = Vector2(90,290)
-        card.size = Vector2(720,860)
-        art.position = Vector2(270,18)
-        art.size = Vector2(180,96)
-        game.modal_title.position = Vector2(30,130)
-        game.modal_text.position = Vector2(47,208)
-        game.modal_action.position = Vector2(34,340)
-        game.modal.get_meta("cargo_library").visible = false
-    else:
-        game.modal_title.position = Vector2(30,190)
-        game.modal_text.position = Vector2(47,271)
-        game.modal_action.position = Vector2(34,475)
-    # Legacy depot chooser belongs only to explicit test mode.
+    game.modal.set_meta("mobile_victory",victory)
+    game.modal.get_meta("pause_help").visible = not victory
+    game.modal.get_meta("cargo_library").visible = false
     var legacy: Array = game.modal.get_meta("pause_only",[])
     for index in range(mini(3,legacy.size())):
         legacy[index].visible = false
+    reflow(game)
     refresh_support(game)
+
+# Coordinates remain in the900px-wide logical viewport. The canvas expands
+# vertically on tall phones; overlays center without shrinking touch targets.
+static func _fit_overlay(overlay: Control, card: Control, viewport_size: Vector2) -> void:
+    var scroller: ScrollContainer
+    if overlay.has_meta("mobile_scroll"):
+        scroller = overlay.get_meta("mobile_scroll")
+    else:
+        scroller = ScrollContainer.new()
+        scroller.name = "MobileCardScroll"
+        scroller.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+        scroller.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+        scroller.follow_focus = true
+        overlay.add_child(scroller)
+        card.reparent(scroller,false)
+        overlay.set_meta("mobile_scroll",scroller)
+    var extent := Vector2(card.size.x+18,minf(card.size.y,viewport_size.y-40))
+    scroller.position = (viewport_size-extent)*.5
+    scroller.size = extent
+    card.position = Vector2.ZERO
+    card.custom_minimum_size = card.size
+    card.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+    # Swiping scrolls on touchscreens; keyboard focus also reveals offscreen
+    # actions on short/square displays. No button is scaled below its hit size.
+    scroller.get_v_scroll_bar().custom_minimum_size.x = 14
+
+static func reflow(game, requested_size: Vector2 = Vector2.ZERO) -> void:
+    if not is_instance_valid(game.ui): return
+    var viewport_size := requested_size
+    if viewport_size == Vector2.ZERO:
+        viewport_size = game.ui.get_viewport_rect().size
+    if viewport_size.x < 1 or viewport_size.y < 1:
+        viewport_size = Vector2(900,1440)
+    var height := maxf(900,viewport_size.y)
+    var width := maxf(900,viewport_size.x)
+    viewport_size = Vector2(width,height)
+    game.ui.set_meta("mobile_viewport",viewport_size)
+    var top: Control = game.ui.get_meta("top_hud")
+    top.size.x = width-36
+    var header_width := top.size.x
+    game.title_label.size.x = header_width-618
+    var wallet: Control = game.money_label.get_parent()
+    wallet.position.x = header_width-594
+    game.ui.get_meta("rescue_button").position.x = header_width-406
+    game.ui.get_meta("cargo_legend_button").position.x = header_width-266
+    game.pause_button.position.x = header_width-142
+    game.ui.get_meta("mission_label").size.x = width-44
+    game.progress_bar.size = Vector2(width-36,9)
+    var toolbar: Control = game.ui.get_meta("test_toolbar")
+    toolbar.position = Vector2((width-toolbar.size.x)*.5,height-toolbar.size.y-16)
+    var context: Rect2 = preload("res://mobile_layout.gd").areas(viewport_size).context
+    game.status_label.position = context.position
+    game.status_label.size = context.size
+    game.status_label.add_theme_font_size_override("font_size",28)
+    game.status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    game.toast_label.position = context.position
+    game.toast_label.size = context.size
+    game.toast_label.add_theme_font_size_override("font_size",30)
+    if is_instance_valid(game.modal):
+        var victory := bool(game.modal.get_meta("mobile_victory",false))
+        var wide := width > 1100 and height < 1200 and not victory
+        var card: Control = game.modal.get_meta("card")
+        var dimensions := Vector2(1180,820) if wide else Vector2(760,776 if victory else 1108)
+        card.custom_minimum_size = dimensions
+        card.size = dimensions
+        var art: TextureRect = game.modal.get_meta("harbor_art")
+        art.visible = not wide
+        art.position = Vector2(290,18)
+        art.size = Vector2(180,96)
+        game.modal_title.position = Vector2(30,20 if wide else 130)
+        game.modal_title.size = Vector2(dimensions.x-60,68)
+        game.modal_text.position = Vector2(42,100 if wide else 210)
+        game.modal_text.size = Vector2(dimensions.x-84,80 if wide else 100)
+        game.modal_text.add_theme_font_size_override("font_size",27)
+        game.modal_action.position = Vector2(34,190 if wide else (620 if victory else 340))
+        game.modal_action.size = Vector2(dimensions.x-68,112)
+        var reward: Control = game.modal.get_meta("win_reward")
+        reward.position = Vector2(34,350)
+        reward.size = Vector2(692,220)
+        var help: Control = game.modal.get_meta("pause_help")
+        help.position = Vector2(34,326 if wide else 486)
+        help.size = Vector2(dimensions.x-68,458 if wide else 590)
+        var undo: Button = game.modal.get_meta("paid_undo")
+        var rescue: Button = game.modal.get_meta("rescue_button")
+        var restart: Button = help.get_meta("restart")
+        var music: Button = game.ui.get_meta("music_toggle")
+        var test: Button = game.modal.get_meta("test_toggle")
+        var harbor: Button = game.modal.get_meta("pause_harbor")
+        var balance: Label = game.modal.get_meta("help_balance")
+        var column := (help.size.x-32)/3 if wide else 338.0
+        undo.position = Vector2.ZERO
+        rescue.position = Vector2(column+16,0)
+        undo.size = Vector2(column,112)
+        rescue.size = Vector2(column,112)
+        balance.position = Vector2(0,124)
+        balance.size = Vector2(help.size.x,68)
+        restart.position = Vector2((column+16)*2,0) if wide else Vector2(0,206)
+        restart.size = Vector2(column if wide else help.size.x,112)
+        game.sound_button.position = Vector2(0,206 if wide else 330)
+        music.position = Vector2(column+16,206 if wide else 330)
+        test.position = Vector2((column+16)*2,206) if wide else Vector2(0,454)
+        harbor.position = Vector2(0,334) if wide else Vector2(column+16,454)
+        game.sound_button.size = Vector2(column,112)
+        music.size = Vector2(column,112)
+        test.size = Vector2(column,112)
+        harbor.size = Vector2(help.size.x if wide else column,112)
+        for button in [undo,rescue,restart,game.sound_button,music,test,harbor]:
+            button.add_theme_font_size_override("font_size",27)
+        _fit_overlay(game.modal,card,viewport_size)
+    if is_instance_valid(game.shop) and game.shop.has_meta("card"):
+        _fit_overlay(game.shop,game.shop.get_meta("card"),viewport_size)
+    if game.ui.has_meta("cargo_legend"):
+        var legend: Control = game.ui.get_meta("cargo_legend")
+        _fit_overlay(legend,legend.get_meta("card"),viewport_size)
 
 static func refresh_support(game) -> void:
     if not is_instance_valid(game.ui): return
@@ -303,7 +407,7 @@ static func refresh_support(game) -> void:
     var price := "50 guld" if used else "gratis"
     var top: Button = game.ui.get_meta("rescue_button")
     top.text = "Välj bil" if mode else ("Heli\n50 guld" if used else "Heli\nGratis")
-    top.add_theme_font_size_override("font_size",18)
+    top.add_theme_font_size_override("font_size",30)
     top.tooltip_text = "Vänd en lastbil 180° · %s · 1 gratis per runda, sedan 50 guld" % price
     top.disabled = busy or not free_bay or bool(game.get("won")) or (used and int(game.get("balance")) < 50)
     if game.modal.has_meta("pause_help"):
@@ -383,18 +487,19 @@ static func celebrate(parent: Control) -> void:
 
 static func _shop(game) -> void:
     game.shop = _backdrop(game.ui)
-    var card := panel(game,game.shop,Vector2(58,264),Vector2(784,912),PAPER,36,24)
+    var card := panel(game,game.shop,Vector2(58,150),Vector2(784,1080),PAPER,36,24)
+    game.shop.set_meta("card",card)
     _label(game,card,"DIN HAMN",Vector2(32,24),Vector2(620,29),22,GOLD_INK,true)
     _label(game,card,"Lite mer plats.",Vector2(30,61),Vector2(660,60),43,INK,true)
     _label(game,card,"En ny kaj för nästa stora leverans.",Vector2(32,127),Vector2(713,37),25,MUTED)
-    var close := _button(game,card,"",Vector2(690,26),Vector2(58,58),game._close_shop,false,"close")
+    var close := _button(game,card,"",Vector2(642,18),Vector2(112,112),game._close_shop,false,"close")
     close.tooltip_text = "Stäng kajbutiken"
     var wallet := panel(game,card,Vector2(30,180),Vector2(724,62),Color("1b547f"),20,0)
     _image(wallet,Art.icon("coin"),Vector2(15,11),Vector2(40,40))
     game.shop_balance = _label(game,wallet,"120 spelmynt",Vector2(69,11),Vector2(630,40),28,GOLD_INK,true)
     for extra in range(2):
         var bay: int = 3+extra
-        var tile := panel(game,card,Vector2(30+float(extra)*372,274),Vector2(352,382),Color("1b4c7d"),25,5)
+        var tile := panel(game,card,Vector2(30+float(extra)*372,274),Vector2(352,438),Color("1b4c7d"),25,5)
         _label(game,tile,"KAJ 04" if extra == 0 else "KAJ 05",Vector2(20,15),Vector2(300,34),25,INK,true)
         _image(tile,Art.harbor_card(extra),Vector2(14,53),Vector2(324,154))
         var description := _label(game,tile,"En extra plats för\ndina leveranser.",Vector2(21,211),Vector2(311,65),25,MUTED)
@@ -403,12 +508,12 @@ static func _shop(game) -> void:
         game.shop_marks.append(mark)
         var price := _label(game,tile,"80 mynt" if extra == 0 else "140 mynt",Vector2(61,277),Vector2(266,39),29,GOLD_INK,true)
         game.shop_prices.append(price)
-        var buy := _button(game,tile,"Öppna kaj",Vector2(17,324),Vector2(318,56),func(): game._buy_dock(bay),true,"",25)
+        var buy := _button(game,tile,"Öppna kaj",Vector2(17,318),Vector2(318,112),func(): game._buy_dock(bay),true,"",25)
         game.shop_buttons.append(buy)
-    _label(game,card,"En utbyggnad att behålla.",Vector2(32,695),Vector2(720,39),28,INK,true)
-    _label(game,card,"Kajerna finns kvar när du börjar om eller byter depå.",Vector2(32,741),Vector2(720,35),23,MUTED)
-    _label(game,card,"Leveranser ger spelmynt. Inga riktiga köp.",Vector2(32,785),Vector2(720,33),23,MUTED)
-    _button(game,card,"Tillbaka till hamnen",Vector2(30,840),Vector2(724,54),game._close_shop,false,"",25)
+    _label(game,card,"En utbyggnad att behålla.",Vector2(32,750),Vector2(720,39),28,INK,true)
+    _label(game,card,"Kajerna finns kvar när du börjar om eller byter depå.",Vector2(32,797),Vector2(720,35),23,MUTED)
+    _label(game,card,"Leveranser ger spelmynt. Inga riktiga köp.",Vector2(32,843),Vector2(720,33),23,MUTED)
+    _button(game,card,"Tillbaka till hamnen",Vector2(30,938),Vector2(724,112),game._close_shop,false,"",25)
     game.shop.visible = false
 
 
@@ -451,7 +556,7 @@ Mynten kommer när en full lastbil kör iväg.",Vector2(28,101),Vector2(664,85),
         symbols[kind] = symbol
     var purpose := _label(game,card,"Spelmynt bygger ut din hamn mellan banorna.",Vector2(28,846),Vector2(664,42),23,Color("a8efd8"),true)
     purpose.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    var close := _button(game,card,"Tillbaka till skiftet",Vector2(28,919),Vector2(664,70),func(): game.call("_close_cargo_legend"),true,"play",27)
+    var close := _button(game,card,"Tillbaka till skiftet",Vector2(28,888),Vector2(664,112),func(): game.call("_close_cargo_legend"),true,"play",27)
     legend.set_meta("values",values)
     legend.set_meta("locks",locks)
     legend.set_meta("cards",cards)

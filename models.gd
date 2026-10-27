@@ -421,19 +421,19 @@ static func cargo(kind: String, scale_factor: float = 1.0, quality: int = 0) -> 
         "kyl":
             _produce(root)
             _box(root,Vector3(0,.344,.025),Vector3(.46,.018,.40),str(Layout.COLORS[kind]),false)
-            mark = _mounted_mark(root,kind,Vector3(0,.355,.025),.39)
+            mark = _mounted_mark(root,kind,Vector3(0,.355,.025),.50)
         "frys":
             _frozen(root)
-            mark = _mounted_mark(root,kind,Vector3(0,.399,0),.42)
+            mark = _mounted_mark(root,kind,Vector3(0,.399,0),.54)
         "schakt":
             _open_bin(root)
             _box(root,Vector3(0,.350,.025),Vector3(.46,.021,.40),str(Layout.COLORS[kind]),false)
-            mark = _mounted_mark(root,kind,Vector3(0,.363,.025),.39)
+            mark = _mounted_mark(root,kind,Vector3(0,.363,.025),.50)
         "adr":
             # One substantial orange industrial drum reads at belt distance;
             # two tiny lid stickers previously disappeared into their rims.
             _drum(root,Vector3(0,.085,0),.225,.385,str(Layout.COLORS[kind]))
-            mark = _mounted_mark(root,kind,Vector3(0,.482,0),.375)
+            mark = _mounted_mark(root,kind,Vector3(0,.482,0),.48)
         "timmer":
             for x in [-.16,0.0,.16]:
                 _log(root,Vector3(x,.16,0),.077,.47)
@@ -442,10 +442,10 @@ static func cargo(kind: String, scale_factor: float = 1.0, quality: int = 0) -> 
             for z in [-.155,.155]:
                 _strap(root,[Vector3(-.24,.092,z),Vector3(-.24,.19,z),Vector3(-.10,.37,z),Vector3(.10,.37,z),Vector3(.24,.19,z),Vector3(.24,.092,z)],.011)
             _box(root,Vector3(0,.374,.025),Vector3(.43,.016,.40),str(Layout.COLORS[kind]),false)
-            mark = _mounted_mark(root,kind,Vector3(0,.384,.025),.39)
+            mark = _mounted_mark(root,kind,Vector3(0,.384,.025),.50)
         "bransle":
             _tank_module(root)
-            mark = _mounted_mark(root,kind,Vector3(0,.511,0),.375)
+            mark = _mounted_mark(root,kind,Vector3(0,.511,0),.48)
         _:
             _produce(root)
             mark = _mounted_mark(root,kind,Vector3(0,.355,.065),.285)

@@ -54,9 +54,24 @@ def main():
     for name in names:
         if name.startswith(("qa/", "tests/", "tools/", "node_modules/")) or "before-v7.cfg" in name:
             raise SystemExit("Local player/test evidence must not be exported")
+    # New HTML must never reuse a previous game's cached project pack. Keep
+    # the stable runtime cached, and version only the changing game content.
+    # index.pck remains as compatibility for an already cached older shell.
+    pack_name = f"hamnskiftet-{hashlib.sha256(pack).hexdigest()[:16]}.pck"
+    config_pattern = r"const GODOT_CONFIG = (\{[^\n]+\});"
+    config_match = re.search(config_pattern, html)
+    if not config_match:
+        raise SystemExit("Missing exported engine configuration")
+    config = json.loads(config_match.group(1))
+    config["mainPack"] = pack_name
+    config["fileSizes"].pop("index.pck", None)
+    config["fileSizes"][pack_name] = len(pack)
+    html = re.sub(config_pattern, lambda _: "const GODOT_CONFIG = "+json.dumps(config,separators=(",",":"))+";", html)
+    (output/pack_name).write_bytes(pack)
+    (output/"index.html").write_text(html)
     commit = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True)
     manifest = {"commit": commit.stdout.strip() if commit.returncode == 0 else "local-preview", "godot": "4.6.2", "platform": "web-single-thread", "files": {}}
-    for name in ["index.html", "index.js", "index.pck", "index.wasm"]:
+    for name in ["index.html", "index.js", "index.pck", "index.wasm", pack_name]:
         data = (output/name).read_bytes()
         manifest["files"][name] = {"bytes": len(data), "sha256": hashlib.sha256(data).hexdigest()}
     (output/"build-info.json").write_text(json.dumps(manifest, indent=2)+"\n")

@@ -20,7 +20,7 @@ jobs:
   test-and-build:
     name: Speltester och mobilwebb
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 30
     permissions:
       contents: read
       pages: read
@@ -64,6 +64,7 @@ jobs:
           server_pid=$!
           trap 'kill "$server_pid"' EXIT
           node tools/browser_smoke.cjs
+          node tools/browser_mobile_layout.cjs
       - name: Spara testloggar
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

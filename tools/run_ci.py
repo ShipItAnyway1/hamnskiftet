@@ -25,6 +25,10 @@ TESTS = (
     ("test_rescue.gd", "RESCUE_FX_TESTS_OK"),
     ("test_audio.gd", "TRUCK_AUDIO_V7_OK"),
     ("test_web_input.gd", "WEB_INPUT_TESTS_OK"),
+    ("test_mobile_layout.gd", "MOBILE_LAYOUT_TESTS_OK"),
+    ("test_mobile_harbor.gd", "MOBILE_HARBOR_TESTS_OK"),
+    ("test_mobile_view.gd", "MOBILE_VIEW_TESTS_OK"),
+    ("test_mobile_gestures.gd", "MOBILE_GESTURES_TESTS_OK"),
 )
 SCRIPT_ERROR = re.compile(r"SCRIPT ERROR|Parse Error|Failed to load script", re.I)
 

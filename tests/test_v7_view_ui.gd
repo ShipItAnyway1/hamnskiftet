@@ -134,8 +134,8 @@ func _run() -> void:
     view.setup(game)
     view.configure({"campaign":true,"config":{"spawn_bounds":Rect2i(5,5,8,10),"types":["kyl","frys"]}})
     check(view.road_viewport.world_3d == game.get_world_3d(),"Third road view shares the real world")
-    check(View.ROAD_RECT.position.y >= 1260 and View.ROAD_RECT.end.y <= 1440,"Road viewport replaces footer without shrinking depot")
-    check(View.YARD_RECT == Rect2(18,616,864,582),"Large readable depot area is preserved")
+    check(view.road_rect.end.y <= root.get_visible_rect().size.y and view.road_rect.position.y > view.yard_rect.end.y,"Responsive road viewport follows the depot and remains inside the canvas")
+    check(view.yard_rect.size.x >= 450 and view.yard_rect.size.y >= 300,"Readable depot uses the available mobile canvas")
     view._process(0)
     game.paused = true
     view._process(0)

@@ -4,6 +4,7 @@ extends CanvasLayer
 # position remapping, simulation, or additional physics worlds are created.
 const L = preload("res://layout.gd")
 const Models = preload("res://models.gd")
+const MobileLayout = preload("res://mobile_layout.gd")
 const DOCK_RECT := Rect2(18,140,864,430)
 const YARD_RECT := Rect2(18,616,864,582)
 const ROAD_RECT := Rect2(18,1290,864,132)
@@ -11,6 +12,15 @@ const ORDER := ["schakt","timmer","kyl","frys","adr","bransle"]
 const INK := Color("f2f9ff")
 const MUTED := Color("a7c6df")
 
+var dock_rect := DOCK_RECT
+var yard_rect := YARD_RECT
+var road_rect := ROAD_RECT
+var _background: ColorRect
+var _yard_heading: Label
+var _dock_heading: Label
+var _compass: Label
+var _fit_area := Rect2()
+var _kinds: Array = []
 var game: Node3D
 var road_viewport: SubViewport
 var road_camera: Camera3D
@@ -44,15 +54,17 @@ func setup(source: Node3D) -> void:
     if old_camera != null and old_camera.cull_mask != 0:
         _original_mask = old_camera.cull_mask
     var background := ColorRect.new()
+    _background = background
     background.name = "AreaBackground"
     background.color = Color("081c34")
     background.mouse_filter = Control.MOUSE_FILTER_IGNORE
     background.size = Vector2(900,1440)
     add_child(background)
-    _label("DEPÅ",Vector2(23,579),Vector2(400,31),24,true)
+    _yard_heading = _label("DEPÅ",Vector2(23,579),Vector2(400,35),28,true)
     # Looking from the east rotates geographic north toward screen right.
     # This is an orientation marker, never a suggested puzzle move.
-    var compass := _label("MOT KAJERNA  →",Vector2(638,584),Vector2(239,27),20,false)
+    var compass := _label("NYP FÖR ATT ZOOMA",Vector2(638,584),Vector2(239,27),20,false)
+    _compass = compass
     compass.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
     compass.modulate = Color("b8d7ec")
     dock_viewport = _viewport("LoadingViewport",DOCK_RECT)
@@ -61,14 +73,14 @@ func setup(source: Node3D) -> void:
     yard_camera = _camera(yard_viewport,80.0,PI*.5)
     dock_texture = _texture(dock_viewport,DOCK_RECT)
     yard_texture = _texture(yard_viewport,YARD_RECT)
-    _label("LASTNING",Vector2(28,146),Vector2(190,31),20,true)
+    _dock_heading = _label("LASTNING",Vector2(28,146),Vector2(220,35),28,true)
     road_viewport = _viewport("TrafficViewport",ROAD_RECT)
     road_camera = _camera(road_viewport,55.0,PI*.5)
     road_camera.size = 3.7
     road_texture = _texture(road_viewport,ROAD_RECT)
     _road_frames.append(road_texture)
     _road_frames.append(road_texture.get_meta("frame"))
-    road_heading = _label("UTFART",Vector2(23,1263),Vector2(850,25),20,true)
+    road_heading = _label("UTFART",Vector2(23,1263),Vector2(850,34),28,true)
     _road_frames.append(road_heading)
     _position_road_camera(Vector3(0,0,24.0))
     legend = Control.new()
@@ -77,8 +89,54 @@ func setup(source: Node3D) -> void:
     legend.position = Vector2(18,1208)
     legend.size = Vector2(864,52)
     add_child(legend)
-    _fit_loading_camera()
+    get_viewport().size_changed.connect(reflow)
+    reflow()
     _refresh_visibility()
+
+
+func reflow(requested: Vector2 = Vector2.ZERO) -> void:
+    if dock_texture == null: return
+    var canvas := requested if requested != Vector2.ZERO else get_viewport().get_visible_rect().size
+    var regions := MobileLayout.areas(canvas)
+    dock_rect = regions.dock
+    yard_rect = regions.yard
+    road_rect = regions.road
+    _background.size = canvas
+    _resize_area(dock_texture,dock_viewport,dock_rect)
+    _resize_area(yard_texture,yard_viewport,yard_rect)
+    _resize_area(road_texture,road_viewport,road_rect)
+    _dock_heading.position = Vector2(dock_rect.position.x+12,dock_rect.position.y+8)
+    _yard_heading.position = Vector2(yard_rect.position.x+4,yard_rect.position.y-40)
+    _compass.position = Vector2(yard_rect.end.x-310,yard_rect.position.y-36)
+    _compass.size = Vector2(300,32)
+    road_heading.position = road_rect.position+Vector2(10,6)
+    road_heading.size = Vector2(260,32)
+    legend.position = regions.context.position
+    legend.size = regions.context.size
+    _fit_loading_camera()
+    if _fit_area.has_area():
+        _fit_camera(yard_camera,_fit_area,1.8,yard_rect.size,80.0,PI*.5)
+        _yard_base_position = yard_camera.position
+        _yard_base_size = yard_camera.size
+        _clamp_pan()
+        _apply_yard_camera()
+    _build_legend(_kinds)
+    if _configured and _campaign and not is_overview():
+        var frozen := bool(game.get("paused")) or bool(game.get("won")) or bool(game.get("failed"))
+        for viewport in [dock_viewport,yard_viewport,road_viewport]:
+            viewport.render_target_update_mode = SubViewport.UPDATE_ONCE if frozen else SubViewport.UPDATE_ALWAYS
+
+func _resize_area(texture: TextureRect, viewport: SubViewport, area: Rect2) -> void:
+    texture.position = area.position
+    texture.size = area.size
+    var frame: Control = texture.get_meta("frame")
+    frame.position = area.position-Vector2(2,2)
+    frame.size = area.size+Vector2(4,4)
+    # Render near physical resolution, never three900px wide worlds on a360px
+    # phone. Cap DPR to retain clear roof marks without thermal GPU waste.
+    var scale := get_viewport().get_screen_transform().get_scale().x
+    var density := clampf(scale,0.85,1.35)
+    viewport.size = Vector2i((area.size*density).round())
 
 func configure(state: Dictionary) -> void:
     if game == null:
@@ -95,7 +153,8 @@ func configure(state: Dictionary) -> void:
     # Small real margins retain roofs, wheels and gate edges without diluting
     # the compact first depot in an empty full-size parking lot.
     area = area.grow(.25)
-    _fit_camera(yard_camera,area,1.8,YARD_RECT.size,80.0,PI*.5)
+    _fit_area = area
+    _fit_camera(yard_camera,area,1.8,yard_rect.size,80.0,PI*.5)
     _yard_base_position = yard_camera.position
     _yard_base_size = yard_camera.size
     _pan_offset = Vector2.ZERO
@@ -103,6 +162,7 @@ func configure(state: Dictionary) -> void:
     var kinds: Array = []
     for kind in ORDER:
         if kind in config.get("types",ORDER): kinds.append(kind)
+    _kinds = kinds
     _build_legend(kinds)
     _refresh_visibility()
 
@@ -110,27 +170,31 @@ func set_zoom(value: float) -> void:
     _zoom = clampf(value,1.0,1.9)
     if is_equal_approx(_zoom,1.0):
         _pan_offset = Vector2.ZERO
+    _clamp_pan()
     _apply_yard_camera()
 
 func pan(relative: Vector2) -> void:
     if is_overview() or _zoom <= 1.0 or yard_camera == null:
         return
-    _pan_offset += Vector2(-relative.x,relative.y)*yard_camera.size/YARD_RECT.size.y
-    var extent := Vector2(_yard_base_size*YARD_RECT.size.x/YARD_RECT.size.y,_yard_base_size)
+    _pan_offset += Vector2(-relative.x,relative.y)*yard_camera.size/yard_rect.size.y
+    _clamp_pan()
+    _apply_yard_camera()
+
+func _clamp_pan() -> void:
+    var extent := Vector2(_yard_base_size*yard_rect.size.x/yard_rect.size.y,_yard_base_size)
     var allowance := extent*(1.0-1.0/_zoom)*.52
     _pan_offset.x = clampf(_pan_offset.x,-allowance.x,allowance.x)
     _pan_offset.y = clampf(_pan_offset.y,-allowance.y,allowance.y)
-    _apply_yard_camera()
 
 func screen_ray(screen: Vector2) -> Dictionary:
     if game == null:
         return {}
     if is_overview():
         return {"camera":game.get("camera"),"point":screen}
-    if DOCK_RECT.has_point(screen):
-        return {"camera":dock_camera,"point":(screen-DOCK_RECT.position)*Vector2(dock_viewport.size)/DOCK_RECT.size}
-    if YARD_RECT.has_point(screen):
-        return {"camera":yard_camera,"point":(screen-YARD_RECT.position)*Vector2(yard_viewport.size)/YARD_RECT.size}
+    if dock_rect.has_point(screen):
+        return {"camera":dock_camera,"point":(screen-dock_rect.position)*Vector2(dock_viewport.size)/dock_rect.size}
+    if yard_rect.has_point(screen):
+        return {"camera":yard_camera,"point":(screen-yard_rect.position)*Vector2(yard_viewport.size)/yard_rect.size}
     return {}
 
 func project(worldpos: Vector3, section: String = "yard") -> Vector2:
@@ -141,7 +205,7 @@ func project(worldpos: Vector3, section: String = "yard") -> Vector2:
         return original.unproject_position(worldpos)
     var loading := section in ["dock","loading","lastning"]
     var camera: Camera3D = dock_camera if loading else yard_camera
-    var area: Rect2 = DOCK_RECT if loading else YARD_RECT
+    var area: Rect2 = dock_rect if loading else yard_rect
     var viewport: SubViewport = dock_viewport if loading else yard_viewport
     return area.position+camera.unproject_position(worldpos)*area.size/Vector2(viewport.size)
 
@@ -190,7 +254,7 @@ func _process(_delta: float) -> void:
             _set_render_updates(viewport,show_areas,frozen)
         var show_road := visible and not bool(game.get("test_mode"))
         for control in _road_frames: control.visible = show_road
-        _set_render_updates(road_viewport,show_road,frozen)
+        _set_render_updates(road_viewport,show_road,frozen or _follow_id < 0)
     if legend != null and is_instance_valid(game):
         var toast: Label = game.get("toast_label")
         var context: Label = game.get("status_label")
@@ -209,6 +273,8 @@ func _set_render_updates(viewport: SubViewport, active: bool, frozen: bool) -> v
 func _refresh_visibility() -> void:
     var active := _configured and _campaign and not is_overview()
     visible = active
+    if road_viewport != null:
+        road_viewport.render_target_update_mode = SubViewport.UPDATE_ONCE if active else SubViewport.UPDATE_DISABLED
     for viewport in [dock_viewport,yard_viewport]:
         if viewport != null:
             viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS if active else SubViewport.UPDATE_DISABLED
@@ -229,7 +295,7 @@ func _viewport(label: String, area: Rect2) -> SubViewport:
     viewport.size = Vector2i(area.size)
     viewport.own_world_3d = false
     viewport.world_3d = game.get_world_3d()
-    viewport.msaa_3d = Viewport.MSAA_4X
+    viewport.msaa_3d = Viewport.MSAA_2X
     viewport.render_target_update_mode = SubViewport.UPDATE_DISABLED
     # Standalone SubViewports receive no automatic input. Main routes root
     # events through screen_ray, using the one authoritative physics world.
@@ -289,7 +355,7 @@ func _fit_loading_camera() -> void:
         maximum = maximum.max(projected)
     var diameter := maximum-minimum
     var center := (minimum+maximum)*.5
-    dock_camera.size = maxf(diameter.y,diameter.x/(DOCK_RECT.size.x/DOCK_RECT.size.y))*1.035
+    dock_camera.size = maxf(diameter.y,diameter.x/(dock_rect.size.x/dock_rect.size.y))*1.035
     dock_camera.position = dock_camera.basis.z*60.0+axis_x*center.x+axis_y*center.y
 
 func _texture(viewport: SubViewport, area: Rect2) -> TextureRect:
@@ -340,18 +406,18 @@ func _build_legend(kinds: Array) -> void:
         icon.texture = Models.icon(kind)
         icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
         icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-        icon.position = Vector2(float(index)*width+(width-28)*.5,0)
-        icon.size = Vector2(28,28)
+        icon.position = Vector2(float(index)*width+8,4)
+        icon.size = Vector2(48,48)
         legend.add_child(icon)
         var label := Label.new()
-        label.text = str(L.NAMES.get(kind,kind))
-        label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        label.text = "ADR" if kind == "adr" else str(L.NAMES.get(kind,kind))
+        label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
         label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-        label.position = Vector2(float(index)*width,29)
-        label.size = Vector2(width,23)
+        label.position = Vector2(float(index)*width+62,5)
+        label.size = Vector2(width-66,44)
         var typeface: Font = game.get("font")
         if typeface != null: label.add_theme_font_override("font",typeface)
-        label.add_theme_font_size_override("font_size",19)
+        label.add_theme_font_size_override("font_size",24)
         label.add_theme_color_override("font_color",INK)
         legend.add_child(label)
 
