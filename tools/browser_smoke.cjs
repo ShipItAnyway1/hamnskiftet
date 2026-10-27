@@ -22,7 +22,7 @@ const layoutOnly=process.argv.includes('--layout-only');
 const safeInsets={top:Number(option('--safe-top','0')),bottom:Number(option('--safe-bottom','0')),left:Number(option('--safe-left','0')),right:Number(option('--safe-right','0'))};
 for(const value of [width,height,...Object.values(safeInsets)]) assert.ok(Number.isFinite(value)&&value>=0,'Valid viewport/inset argument');
 assert.ok(width>0&&height>0,'Positive viewport dimensions');
-const evidence = {url, emulation:{width,height,dpr,hasTouch:true,isMobile:true,safeInsets}, console:[], pageErrors:[], responses:[], requestFailures:[], checks:[], saves:[], touches:[], inputEvents:[], environments:[], layouts:[], layoutAudits:[], gestures:[]};
+const evidence = {url, emulation:{width,height,dpr,hasTouch:true,isMobile:true,safeInsets}, console:[], pageErrors:[], responses:[], requestFailures:[], checks:[], saves:[], savePolls:[], touches:[], inputEvents:[], environments:[], layouts:[], layoutAudits:[], gestures:[]};
 const persist = () => fs.writeFileSync(path.join(output,'evidence.json'), JSON.stringify(evidence,null,2));
 let browser;
 let page;
@@ -54,15 +54,29 @@ async function readSave(page) {
  });
 }
 async function pollSave(page, predicate, description) {
- const deadline=Date.now()+30000;
- let saved;
- while(Date.now()<deadline) {
-  saved=await readSave(page);
-  if(saved && predicate(saved.text)) return saved;
+ // Web IDBFS writes are asynchronous. A software-rendered CI frame can take
+ // seconds; observe persistence separately from the already-observed UI action.
+ const started=Date.now(),budgetMs=120000;
+ let saved,attempts=0,lastSignature;
+ const observe=(match,outcome)=>{
+  const currentStatuses=saved?statuses(saved.text):[];
+  const signature=JSON.stringify([Boolean(saved),currentStatuses,match]);
+  if(signature!==lastSignature||outcome) {
+   evidence.savePolls.push({phase,description,elapsedMs:Date.now()-started,statuses:currentStatuses,match,attempts,...(outcome?{outcome}:{})});
+   lastSignature=signature;persist();
+  }
+ };
+ while(Date.now()-started<budgetMs) {
+  saved=await readSave(page);attempts++;
+  const match=Boolean(saved&&predicate(saved.text));
+  observe(match,match?'matched':undefined);
+  if(match)return saved;
   await page.waitForTimeout(500);
  }
- if(saved) {recordSave('failure-last',saved); evidence.failedPredicate={phase,description};persist();}
- throw new Error(description+' (no matching persisted save within30s; last='+String(saved?.text).slice(0,180)+')');
+ observe(false,'timeout');
+ if(saved)recordSave('failure-before-timeout',saved);
+ evidence.failedPredicate={phase,description,budgetMs,elapsedMs:Date.now()-started,attempts};persist();
+ throw new Error(description+' (no matching persisted save within120s; last='+String(saved?.text).slice(0,180)+')');
 }
 function statuses(text) {return [...text.matchAll(/"status"\s*:\s*"([^"]+)"/g)].map(match=>match[1]);}
 function activeStageOne(text) {return /\[campaign\]/.test(text)&&/"stage"\s*:\s*1\b/.test(text)&&statuses(text).some(status=>status!=='yard');}
@@ -183,7 +197,7 @@ async function check(name, operation) {
   await touch(point.x,point.y,label||key);
  };
  const touchVehicle=async(id)=>{
-  const layout=await readLayout(value=>value.vehicles?.some(vehicle=>vehicle.id===id&&Array.isArray(vehicle.pick)));
+  const layout=await readLayout(value=>value.screen==='game'&&controlReady(value,'pause')&&value.vehicles?.some(vehicle=>vehicle.id===id&&Array.isArray(vehicle.pick)));
   const vehicle=layout.vehicles.find(item=>item.id===id);
   const point=toCss(vehicle.pick,layout,await canvasRect());
   await touch(point.x,point.y,'dispatch-visible-truck-'+id);
@@ -311,9 +325,13 @@ async function check(name, operation) {
  await auditLayout('layout-harbor');
  phase='real-touch';
  await touchControl('harbor_play','start-stage1'); // Actual current rendered primary button.
- await page.waitForTimeout(1000);
+ await readLayout(value=>value.screen==='game'&&controlReady(value,'pause'));
  await auditLayout('layout-stage');
  await touchVehicle(2); // Same actual stage1 truck as before; only its observed projection changes.
+ await check('real truck touch removes truck2 from the observed yard',async()=>{
+  const layout=await readLayout(value=>value.screen==='game'&&controlReady(value,'pause')&&Array.isArray(value.vehicles)&&!value.vehicles.some(vehicle=>vehicle.id===2));
+  evidence.layouts.push({label:'dispatch-observed',...layout});persist();
+ });
  await page.waitForTimeout(2200);
  await screenshot('02-truck-touch-and-road');
  await check('real truck touch persists a non-yard stage1 truck',async()=>{

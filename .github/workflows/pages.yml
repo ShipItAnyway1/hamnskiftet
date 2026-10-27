@@ -9,6 +9,7 @@ on:
 permissions:
   contents: read
 
+# A newer run on the same ref cancels every older build/test/deploy in flight.
 concurrency:
   group: pages-${{ github.ref }}
   cancel-in-progress: true
@@ -18,15 +19,20 @@ env:
 
 jobs:
   test-and-build:
-    name: Speltester och mobilwebb
+    name: Speltester och webbexport
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 10
     permissions:
       contents: read
-      pages: read
     steps:
+      - name: Starta jobblogg
+        run: |
+          mkdir -p ci-results
+          printf 'job=build\nsha=%s\nrun=%s\nattempt=%s\n' "$GITHUB_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" > ci-results/job.txt
       - name: Hämta spelkoden
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          clean: false
       - name: Installera verifierad Godot
         shell: bash
         run: |
@@ -45,10 +51,53 @@ jobs:
       - name: Hämta den versionslåsta webbexportmallen
         run: python3 tools/fetch_web_template.py --version "$GODOT_VERSION"
       - name: Bygg webbversionen
+        shell: bash
         run: |
+          set -o pipefail
           mkdir -p build/web
           godot --headless --path . --log-file "$PWD/ci-results/web-export.godot.log" --export-release Web build/web/index.html 2>&1 | tee ci-results/web-export.stdout.log
           python3 tools/check_web_build.py --build-dir build/web --log ci-results/web-export.stdout.log
+          test -f build/web/.nojekyll
+      - name: Spara samma webbbyggnad för alla tester och publicering
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: web-candidate
+          path: build/web/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 1
+      - name: Spara testloggar
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: testloggar
+          path: ci-results/
+          if-no-files-found: warn
+          retention-days: 7
+
+  full-browser:
+    name: Fullständigt mobilwebbtest
+    needs: test-and-build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Starta jobblogg
+        run: |
+          mkdir -p ci-results
+          printf 'job=full-browser\nsha=%s\nrun=%s\nattempt=%s\n' "$GITHUB_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" > ci-results/job.txt
+      - name: Hämta samma spelkod
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          clean: false
+      - name: Hämta kandidatbyggnaden från denna körning
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: web-candidate
+          path: build/web
+      - name: Kontrollera kandidatens webbinställningar
+        run: test -f build/web/.nojekyll
       - name: Installera webbläsartestet
         run: |
           npm ci --ignore-scripts --no-audit --no-fund
@@ -58,42 +107,138 @@ jobs:
           else
             npx playwright install --with-deps chromium
           fi
-      - name: Provspela den exporterade mobilwebben
+      - name: Provspela den exporterade mobilwebben fullständigt
+        shell: bash
         run: |
+          set -o pipefail
           python3 -m http.server 8765 --bind 127.0.0.1 --directory build/web > ci-results/web-server.log 2>&1 &
           server_pid=$!
-          trap 'kill "$server_pid"' EXIT
-          node tools/browser_smoke.cjs
-          node tools/browser_mobile_layout.cjs
-      - name: Spara testloggar
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          node tools/browser_smoke.cjs 2>&1 | tee ci-results/browser-smoke.stdout.log
+      - name: Spara fullständiga webbläsarloggar och bilder även vid fel
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: testloggar
+          name: browser-testloggar
           path: ci-results/
+          if-no-files-found: warn
           retention-days: 7
-      - name: Förbered GitHub Pages
-        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
-      - name: Ladda upp det testade spelet
-        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
-        with:
-          path: build/web
 
-  deploy:
-    name: Publicera spellänken
-    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+  mobile-layout:
+    name: Mobilvy · ${{ matrix.case }}
     needs: test-and-build
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        case:
+          - phone-360x640
+          - phone-390x844
+          - phone-430x932-retina
+          - tablet-768x1024
+          - landscape-and-rotation
+          - safe-area-390x844
+    steps:
+      - name: Starta jobblogg
+        env:
+          MATRIX_CASE: ${{ matrix.case }}
+        run: |
+          mkdir -p ci-results
+          printf 'job=mobile\ncase=%s\nsha=%s\nrun=%s\nattempt=%s\n' "$MATRIX_CASE" "$GITHUB_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" > ci-results/job.txt
+      - name: Hämta samma spelkod
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          clean: false
+      - name: Hämta kandidatbyggnaden från denna körning
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: web-candidate
+          path: build/web
+      - name: Installera webbläsartestet
+        run: |
+          test -f build/web/.nojekyll
+          npm ci --ignore-scripts --no-audit --no-fund
+          task_chrome="$(command -v google-chrome || command -v google-chrome-stable || true)"
+          if [ -n "$task_chrome" ]; then
+            echo "PLAYWRIGHT_EXECUTABLE_PATH=$task_chrome" >> "$GITHUB_ENV"
+          else
+            npx playwright install --with-deps chromium
+          fi
+      - name: Kontrollera en verklig mobilvy
+        shell: bash
+        env:
+          MATRIX_CASE: ${{ matrix.case }}
+        run: |
+          set -o pipefail
+          python3 -m http.server 8765 --bind 127.0.0.1 --directory build/web > ci-results/web-server.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          node tools/browser_mobile_layout.cjs --cases "$MATRIX_CASE" 2>&1 | tee ci-results/mobile.stdout.log
+      - name: Spara mobilvyns loggar och bilder även vid fel
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: mobile-${{ matrix.case }}
+          path: ci-results/
+          if-no-files-found: warn
+          retention-days: 7
+
+  deploy:
+    name: Publicera den färdigtestade spellänken
+    # No always(): one failed/skipped/cancelled matrix child blocks publication.
+    if: success() && github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    needs: [test-and-build, full-browser, mobile-layout]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
       pages: write
       id-token: write
     environment:
       name: github-pages
       url: ${{ steps.publish.outputs.page_url }}
     steps:
+      - name: Starta publiceringslogg
+        run: |
+          mkdir -p ci-results
+          printf 'job=deploy\nsha=%s\nrun=%s\nattempt=%s\n' "$GITHUB_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" > ci-results/job.txt
+      - name: Förbered GitHub Pages
+        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+      - name: Hämta exakt den testade kandidatbyggnaden
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: web-candidate
+          path: build/web
+      - name: Kontrollera att dolda webbinställningar följde med
+        run: test -f build/web/.nojekyll
+      - name: Ladda upp det testade spelet
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: build/web
+      - name: Stoppa en äldre körning från att publicera över nyare main
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -o pipefail
+          current_sha="$(curl --fail --silent --show-error --retry 3 \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/git/ref/heads/main" \
+            | python3 -c 'import json,sys; print(json.load(sys.stdin)["object"]["sha"])')"
+          printf 'candidate=%s\nmain=%s\n' "$GITHUB_SHA" "$current_sha" | tee ci-results/freshness.txt
+          test "$current_sha" = "$GITHUB_SHA"
       - name: Publicera
         id: publish
         uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
+      - name: Spara publiceringslogg
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: publiceringslogg
+          path: ci-results/
+          if-no-files-found: warn
+          retention-days: 7
